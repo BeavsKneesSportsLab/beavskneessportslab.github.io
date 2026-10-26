@@ -369,7 +369,7 @@ Views.board = async (sport) => {
     Object.entries({ src: "https://giscus.app/client.js", "data-repo": GISCUS.repo, "data-repo-id": GISCUS.repoId,
       "data-category": GISCUS.category, "data-category-id": GISCUS.categoryId, "data-mapping": "specific",
       "data-term": `${sport}-${cur}`, "data-strict": "1", "data-reactions-enabled": "1", "data-emit-metadata": "0",
-      "data-input-position": "top", "data-theme": dark ? "dark" : "light", "data-lang": "en", "data-loading": "lazy",
+      "data-input-position": "top", "data-theme": dark ? "dark" : "light", "data-lang": "en",
       crossorigin: "anonymous" }).forEach(([k, v]) => s.setAttribute(k, v));
     s.async = true;
     box.append(s);
