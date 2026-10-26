@@ -2,14 +2,14 @@
 const SPORTS = {
   cfb: { name: "CFB", full: "College Football", path: "football/college-football", featured: true,
          tabs: [["ratings", "Power Ratings"], ["predictions", "Predictions"], ["disappoint", "Most Disappointing"],
-                ["recruiting", "Recruiting"], ["portal", "Transfer Portal"], ["record", "Model vs Market"], ["sim", "Game Sim"], ["teams", "Teams"]] },
+                ["recruiting", "Recruiting"], ["portal", "Transfer Portal"], ["record", "Model vs Market"], ["sim", "Game Sim"], ["teams", "Teams"], ["board", "Message Board"]] },
   nfl: { name: "NFL", full: "NFL", path: "football/nfl" },
   nba: { name: "NBA", full: "NBA", path: "basketball/nba" },
   mlb: { name: "MLB", full: "MLB", path: "baseball/mlb" },
   nhl: { name: "NHL", full: "NHL", path: "hockey/nhl" },
 };
 const PRO_TABS = [["ratings", "Power Ratings"], ["predictions", "Predictions"], ["record", "Model vs Market"], ["standings", "Standings"],
-                  ["rumors", "Trade Rumors"], ["trade", "Trade Simulator"], ["sim", "Game Sim"], ["teams", "Teams"]];
+                  ["rumors", "Trade Rumors"], ["trade", "Trade Simulator"], ["sim", "Game Sim"], ["teams", "Teams"], ["board", "Message Board"]];
 for (const k of ["nfl", "nba", "mlb", "nhl"]) SPORTS[k].tabs = PRO_TABS;
 
 const _cache = {};

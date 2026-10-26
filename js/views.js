@@ -347,3 +347,37 @@ Views.record = async (sport) => {
     graded.length ? h("div", { class: "card tight", style: { marginTop: "16px" } }, h("h2", {}, "Graded games"), table(cols, rows, { sort: "date", maxH: "640px" })) : null,
     h("div", { class: "note" }, "Green means the model beat the book on that measure, red means it didn't. Closing lines usually win: they price in injuries, weather and sharp money the model never sees. That's why this page exists - to keep the predictions honest, not to sell them."));
 };
+
+/* ---------- message board (Giscus: GitHub Discussions on the site repo) ----------
+   Each thread is one Discussion in the Announcements category, matched by a fixed term
+   ("cfb-general", ...). Only maintainers + the Giscus app can open discussions there, so
+   visitors reply inside the standing threads instead of spawning new ones. */
+const GISCUS = { repo: "BeavsKneesSportsLab/beavskneessportslab.github.io", repoId: "R_kgDOVYjOUQ",
+                 category: "Announcements", categoryId: "DIC_kwDOVYjOUc4DJs7O" };
+const BOARD_THREADS = {
+  cfb: [["general", "General"], ["gameday", "Game Day"], ["beavs", "Beavs Corner"], ["recruiting", "Recruiting & Portal"], ["model", "Model Talk"]],
+  pro: [["general", "General"], ["gameday", "Game Day"], ["trades", "Trade Talk"], ["model", "Model Talk"]],
+};
+Views.board = async (sport) => {
+  const threads = BOARD_THREADS[sport] || BOARD_THREADS.pro;
+  let cur = threads[0][0];
+  const box = h("div", { class: "card board" });
+  const draw = () => {
+    box.replaceChildren();
+    const dark = document.documentElement.dataset.theme !== "light";
+    const s = document.createElement("script");
+    Object.entries({ src: "https://giscus.app/client.js", "data-repo": GISCUS.repo, "data-repo-id": GISCUS.repoId,
+      "data-category": GISCUS.category, "data-category-id": GISCUS.categoryId, "data-mapping": "specific",
+      "data-term": `${sport}-${cur}`, "data-strict": "1", "data-reactions-enabled": "1", "data-emit-metadata": "0",
+      "data-input-position": "top", "data-theme": dark ? "dark" : "light", "data-lang": "en", "data-loading": "lazy",
+      crossorigin: "anonymous" }).forEach(([k, v]) => s.setAttribute(k, v));
+    s.async = true;
+    box.append(s);
+  };
+  draw();
+  mount(
+    h("h1", {}, `${SPORTS[sport].full} Message Board`),
+    h("p", { class: "lede" }, "Talk ball. Anyone can read; posting takes a free GitHub account (it keeps the spam out). Be decent - posts that aren't get removed."),
+    h("div", { class: "toolbar" }, seg(threads, cur, v => { cur = v; draw(); })),
+    box);
+};
