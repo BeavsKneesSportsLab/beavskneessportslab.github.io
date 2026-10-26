@@ -300,3 +300,50 @@ Views.home = async () => {
         worst.map(x => { const t = team(cfb, x.id); return h("div", { style: { display: "flex", justifyContent: "space-between", padding: "5px 0" } },
           h("a", { class: "team-cell", href: `#/cfb/team/${t.id}` }, logo(t), t.short), h("span", { class: "small muted" }, `${x.actW}-${x.gp - x.actW} · exp ${fmt.n(x.expW)} W`)); }))) : errorBox(new Error("cfb.json missing")));
 };
+
+/* ---------- model vs closing line ---------- */
+Views.record = async (sport) => {
+  const [d, L] = await Promise.all([sportData(sport), load(`ledger_${sport}`)]);
+  const s = L.summary || {}, spreadSport = ["cfb", "nfl", "nba"].includes(sport);
+  const rec = r => r ? `${r[0]}-${r[1]}${r[2] ? `-${r[2]}` : ""}` : "–";
+  const pctOf = r => r && r[0] + r[1] ? fmt.pct(r[0] / (r[0] + r[1]), 1) : "–";
+  const all = Object.entries(L.games).map(([id, e]) => ({ id, ...e }));
+  const graded = all.filter(e => e.hs != null && e.close && e.model).sort((a, b) => b.date.localeCompare(a.date));
+  const pending = all.filter(e => e.hs == null).length;
+  const side = (homeMargin, H, A) => Math.abs(homeMargin) < 0.25 ? "PK" : homeMargin > 0 ? `${H.abbr} -${fmt.n(homeMargin, 1)}` : `${A.abbr} -${fmt.n(-homeMargin, 1)}`;
+  const kpi = (label, val, sub, good) => h("div", { class: "kpi" }, h("span", {}, label), h("b", { class: good == null ? "" : good ? "pos" : "neg" }, val), sub ? h("div", { class: "small muted" }, sub) : null);
+  const rows = graded.map(e => {
+    const H = team(d, e.home), A = team(d, e.away), m = e.model, c = e.close, margin = e.hs - e.as;
+    const edge = c.spread != null ? m.margin + c.spread : null, res = c.spread != null ? margin + c.spread : null;
+    const result = edge == null || Math.abs(edge) < 0.5 ? null : res === 0 ? "P" : (res > 0) === (edge > 0) ? "W" : "L";
+    const q = noVigHome(c);
+    return { e, H, A, edge, result, q, su: (m.pHome > 0.5) === (margin > 0) };
+  });
+  const cols = [
+    { k: "date", label: "Date", sort: r => r.e.date, fmt: r => fmt.date(r.e.date) },
+    { k: "game", label: "Game", nosort: true, fmt: r => h("span", { class: "team-cell" }, logo(r.A), r.A.abbr, h("span", { class: "muted" }, r.e.neutral ? "vs" : "@"), logo(r.H), r.H.abbr) },
+    { k: "final", label: "Final", nosort: true, fmt: r => `${r.e.as}-${r.e.hs}` },
+    spreadSport ? { k: "model", label: "Model line", nosort: true, fmt: r => h("span", { class: "mono" }, side(r.e.model.margin, r.H, r.A)) } : null,
+    spreadSport ? { k: "close", label: "DK close", nosort: true, fmt: r => h("span", { class: "mono" }, r.e.close.spread == null ? "–" : side(-r.e.close.spread, r.H, r.A)) } : null,
+    spreadSport ? { k: "edge", label: "Gap", num: true, sort: r => r.edge == null ? null : Math.abs(r.edge), title: "Points the model differed from the closing spread", fmt: r => r.edge == null ? "–" : fmt.n(Math.abs(r.edge), 1) } : null,
+    spreadSport ? { k: "result", label: "Model side", sort: r => r.result, fmt: r => r.result ? h("b", { class: r.result === "W" ? "pos" : r.result === "L" ? "neg" : "" }, r.result) : h("span", { class: "muted" }, "agree") } : null,
+    { k: "pm", label: `Model ${"home"} win%`, num: true, sort: r => r.e.model.pHome, fmt: r => fmt.pct(r.e.model.pHome) },
+    { k: "pb", label: "Book home win%", num: true, sort: r => r.q, fmt: r => fmt.pct(r.q) },
+    { k: "su", label: "Model winner", sort: r => r.su, fmt: r => h("b", { class: r.su ? "pos" : "neg" }, r.su ? "✓" : "✗") },
+  ].filter(Boolean);
+  mount(
+    h("h1", {}, `${SPORTS[sport].full}: Model vs Market`),
+    h("p", { class: "lede" }, "Every game graded two ways: our model's PREGAME numbers (snapshotted before kickoff and never edited after) against DraftKings' CLOSING line, the sharpest public number there is. " +
+      (sport === "cfb" ? "CFB is backfilled for the whole season with no hindsight: each week is predicted from ratings fit only on games before it. FBS vs FBS only." : "Tracking started 10/26/26.")),
+    s.n ? h("div", { class: "kpis" },
+      kpi("Games graded", s.n, pending ? `${pending} pending` : null),
+      kpi("Winner picked", `${fmt.pct(s.suModel, 1)} vs ${fmt.pct(s.suBook, 1)}`, "model vs book favorite", s.suModel >= s.suBook),
+      kpi("Brier score", `${fmt.n(s.brierModel, 3)} vs ${fmt.n(s.brierBook, 3)}`, "win-prob accuracy, lower is better", s.brierModel <= s.brierBook),
+      spreadSport ? kpi("Avg miss (pts)", `${fmt.n(s.maeModel, 1)} vs ${fmt.n(s.maeBook, 1)}`, "|final margin - line|, model vs close", s.maeModel <= s.maeBook) : null,
+      spreadSport ? kpi("Model side vs close", rec(s.ats), `${pctOf(s.ats)} · break-even 52.4%`, s.ats && s.ats[0] / Math.max(1, s.ats[0] + s.ats[1]) > 0.524) : null,
+      spreadSport ? kpi("Gap ≥ 3 pts", rec(s.atsBig), pctOf(s.atsBig), s.atsBig && s.atsBig[0] / Math.max(1, s.atsBig[0] + s.atsBig[1]) > 0.524) : null,
+      s.ou && s.ou[0] + s.ou[1] ? kpi("Totals vs close", rec(s.ou), pctOf(s.ou), s.ou[0] / (s.ou[0] + s.ou[1]) > 0.524) : null)
+      : h("div", { class: "card empty" }, `No graded games yet${pending ? ` - ${pending} games snapshotted and waiting on results` : ""}. Grades appear the morning after games finish.`),
+    graded.length ? h("div", { class: "card tight", style: { marginTop: "16px" } }, h("h2", {}, "Graded games"), table(cols, rows, { sort: "date", maxH: "640px" })) : null,
+    h("div", { class: "note" }, "Green means the model beat the book on that measure, red means it didn't. Closing lines usually win: they price in injuries, weather and sharp money the model never sees. That's why this page exists - to keep the predictions honest, not to sell them."));
+};

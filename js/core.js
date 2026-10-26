@@ -2,13 +2,13 @@
 const SPORTS = {
   cfb: { name: "CFB", full: "College Football", path: "football/college-football", featured: true,
          tabs: [["ratings", "Power Ratings"], ["predictions", "Predictions"], ["disappoint", "Most Disappointing"],
-                ["recruiting", "Recruiting"], ["portal", "Transfer Portal"], ["sim", "Game Sim"], ["teams", "Teams"]] },
+                ["recruiting", "Recruiting"], ["portal", "Transfer Portal"], ["record", "Model vs Market"], ["sim", "Game Sim"], ["teams", "Teams"]] },
   nfl: { name: "NFL", full: "NFL", path: "football/nfl" },
   nba: { name: "NBA", full: "NBA", path: "basketball/nba" },
   mlb: { name: "MLB", full: "MLB", path: "baseball/mlb" },
   nhl: { name: "NHL", full: "NHL", path: "hockey/nhl" },
 };
-const PRO_TABS = [["ratings", "Power Ratings"], ["predictions", "Predictions"], ["standings", "Standings"],
+const PRO_TABS = [["ratings", "Power Ratings"], ["predictions", "Predictions"], ["record", "Model vs Market"], ["standings", "Standings"],
                   ["rumors", "Trade Rumors"], ["trade", "Trade Simulator"], ["sim", "Game Sim"], ["teams", "Teams"]];
 for (const k of ["nfl", "nba", "mlb", "nhl"]) SPORTS[k].tabs = PRO_TABS;
 
@@ -49,7 +49,7 @@ function h(tag, attrs, ...kids) {
   return el;
 }
 const $ = (s, r = document) => r.querySelector(s);
-function mount(...nodes) { const app = $("#app"); app.replaceChildren(...nodes); window.scrollTo(0, 0); }
+function mount(...nodes) { const app = $("#app"); app.replaceChildren(...nodes.filter(n => n != null && n !== false)); window.scrollTo(0, 0); }
 
 function logo(t, cls = "") {
   return t && t.logo ? h("img", { class: `logo ${cls}`, src: t.logo, alt: "", loading: "lazy" })
