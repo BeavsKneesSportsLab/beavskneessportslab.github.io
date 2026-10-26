@@ -60,7 +60,32 @@ function gameCard(sport, d, g) {
       h("i", { style: { width: `${pH * 100}%`, background: H.color } })),
     h("div", { class: "game-foot" }, h("span", {}, "Model: ", h("b", {}, spreadText(sport, d, g))),
       h("span", {}, done ? `Final ${g.as}-${g.hs}` : `Fair ML ${american(pA)} / ${american(pH)}`),
-      h("a", { class: "link", href: `#/${sport}/sim/${g.away}/${g.home}${g.neutral ? "/n" : ""}` }, "Simulate →")));
+      h("a", { class: "link", href: `#/${sport}/sim/${g.away}/${g.home}${g.neutral ? "/n" : ""}` }, "Simulate →")),
+    marketBlock(sport, d, g, A, H));
+}
+
+/* What the book is actually offering next to what the model says. Model numbers are fair values,
+   DraftKings numbers are real prices - keep them visibly separate. */
+function marketBlock(sport, d, g, A, H) {
+  const m = g.mkt;
+  if (!m) return h("div", { class: "mkt muted" }, "No sportsbook line posted yet");
+  const goals = sport === "nhl" || sport === "mlb";
+  const bookP = noVigHome(m);
+  const bits = [];
+  if (!goals && m.spread != null) {
+    const diff = g.margin + m.spread;                     // >0: model likes home more than the book
+    const fav = diff > 0 ? H : A;
+    bits.push(Math.abs(diff) < 0.5 ? "spread: agrees" : `spread: model ${fmt.n(Math.abs(diff), 1)} pts more on ${fav.abbr || fav.short}`);
+  }
+  if (bookP != null) bits.push(`win %: model ${fmt.pct(g.pHome)} vs book ${fmt.pct(bookP)} (${H.abbr || H.short})`);
+  const projTot = sport !== "cfb" && g.projHome != null ? g.projHome + g.projAway : null;
+  if (projTot != null && m.total != null) bits.push(`total: model ${fmt.n(projTot, 1)} vs ${m.total}`);
+  return h("div", { class: "mkt" },
+    h("div", { class: "mkt-line" }, h("span", { class: "chip book" }, m.book || "Book"),
+      !goals && m.spread != null ? h("span", {}, h("b", {}, `${H.abbr || H.short} ${fmtSpread(m.spread)}`)) : null,
+      m.total != null ? h("span", {}, `O/U `, h("b", {}, m.total)) : null,
+      m.mlA != null ? h("span", {}, `ML `, h("b", {}, `${fmtML(m.mlA)} / ${fmtML(m.mlH)}`)) : null),
+    bits.length ? h("div", { class: "mkt-cmp" }, bits.join(" · ")) : null);
 }
 
 Views.predictions = async (sport) => {
@@ -75,6 +100,8 @@ Views.predictions = async (sport) => {
     let ps = preds;
     if (filter === "top" && sport === "cfb") ps = ps.filter(g => (team(d, g.home).rank || 99) <= 25 || (team(d, g.away).rank || 99) <= 25);
     if (filter === "close") ps = ps.filter(g => Math.abs(g.pHome - 0.5) < 0.12);
+    if (filter === "disagree") ps = ps.filter(g => noVigHome(g.mkt) != null)
+      .sort((a, b) => Math.abs(b.pHome - noVigHome(b.mkt)) - Math.abs(a.pHome - noVigHome(a.mkt)));
     box.replaceChildren(...(ps.length ? ps.map(g => gameCard(sport, d, g)) : [h("div", { class: "empty" }, "No upcoming games in the window.")]));
   };
   draw();
@@ -82,10 +109,10 @@ Views.predictions = async (sport) => {
     h("h1", {}, `${SPORTS[sport].full} Predictions`),
     h("p", { class: "lede" }, sport === "cfb" ? `Week ${d.upcomingWeek} - model spread and win probability for every FBS game.` :
       "Next few days of games - model margin, win probability (normal, σ=" + d.sigma + " " + d.unit + "), and projected score from team scoring rates."),
-    h("div", { class: "toolbar" }, seg([["all", "All games"], ...(sport === "cfb" ? [["top", "Top-25 involved"]] : []), ["close", "Coin flips"]],
+    h("div", { class: "toolbar" }, seg([["all", "All games"], ...(sport === "cfb" ? [["top", "Top-25 involved"]] : []), ["close", "Coin flips"], ["disagree", "Model vs book"]],
       filter, v => { filter = v; draw(); })),
     box,
-    h("div", { class: "note" }, "Fair ML is the model's no-vig price, not a book line. Compare it against a real sportsbook number before reading anything into it."),
+    h("div", { class: "note" }, "\"Model\" numbers are our fair values. The DraftKings line (via ESPN) is what's actually being offered - it is refreshed each build, so check the book before acting, since lines move. None of these models has beaten closing lines in honest backtests, so a big model-vs-book gap is more often model error than value."),
   );
 };
 
@@ -212,6 +239,10 @@ Views.team = async (sport, id) => {
     { k: "opp", label: "Opponent", nosort: true, fmt: r => h("span", { class: "team-cell" }, h("span", { class: "muted" }, r.g.neutral ? "vs" : r.home ? "vs" : "@"), logo(r.opp), r.opp.short || r.opp.name) },
     { k: "res", label: "Result", nosort: true, fmt: r => r.g.state === "post" && r.my != null ? h("b", { class: r.my > r.their ? "pos" : "neg" }, `${r.my > r.their ? "W" : "L"} ${r.my}-${r.their}`) : h("span", { class: "muted" }, r.g.state === "in" ? "Live" : "") },
     isCfb ? { k: "p", label: "Model win %", num: true, nosort: true, fmt: r => r.p == null ? "–" : h("span", { class: r.p >= 0.5 ? "pos" : "neg" }, fmt.pct(r.p)) } : null,
+    { k: "line", label: "Book", nosort: true, title: "DraftKings line via ESPN, from this team's side", fmt: r => {
+        const m = r.g.mkt; if (!m || r.g.state === "post") return "";
+        if (["nhl", "mlb"].includes(sport) || m.spread == null) return h("span", { class: "mono" }, fmtML(r.home ? m.mlH : m.mlA));
+        return h("span", { class: "mono" }, fmtSpread(r.home ? m.spread : -m.spread)); } },
     { k: "sim", label: "", nosort: true, fmt: r => r.g.state !== "post" ? h("a", { class: "link small", href: `#/${sport}/sim/${r.g.away}/${r.g.home}${r.g.neutral ? "/n" : ""}` }, "Sim") : "" },
   ].filter(Boolean), schedRows, { sort: "date", asc: true, maxH: "520px" });
 

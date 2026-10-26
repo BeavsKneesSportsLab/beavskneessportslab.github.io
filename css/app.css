@@ -192,3 +192,7 @@ td.num { font-variant-numeric: tabular-nums; }
 table.t td.wrap { white-space: normal; min-width: 220px; max-width: 360px; }
 .hero-logo { width: 96px; height: 100px; float: right; margin-left: 16px; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,.5)); }
 @media (max-width: 600px) { .brand span.full { display: none; } .hero-logo { width: 60px; height: 60px; } }
+.mkt { margin-top: 9px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 12px; }
+.mkt-line { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.mkt-cmp { color: var(--muted); margin-top: 4px; }
+.chip.book { background: #1f7a3a; color: #fff; }

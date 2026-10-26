@@ -82,6 +82,14 @@ function spreadText(sport, d, g) {
   if (["nhl", "mlb"].includes(sport)) return `${fav.abbr || fav.short} by ${m.toFixed(2)} ${d.unit}`;
   return `${fav.abbr || fav.short} -${(Math.round(m * 2) / 2).toFixed(1)}`;
 }
+/* ---------- sportsbook lines (DraftKings via ESPN) ---------- */
+const mlProb = ml => ml == null ? null : ml < 0 ? -ml / (-ml + 100) : 100 / (ml + 100);
+const fmtML = ml => ml == null ? "–" : ml > 0 ? `+${ml}` : `${ml}`;
+function noVigHome(m) {             // book's win probability for the home side with the vig removed
+  const h = mlProb(m?.mlH), a = mlProb(m?.mlA);
+  return h == null || a == null ? null : h / (h + a);
+}
+const fmtSpread = s => s == null ? "–" : s === 0 ? "PK" : (s > 0 ? "+" : "") + s;
 function american(p) {
   if (p <= 0 || p >= 1) return "–";
   return p >= 0.5 ? `${Math.round(-100 * p / (1 - p))}` : `+${Math.round(100 * (1 - p) / p)}`;

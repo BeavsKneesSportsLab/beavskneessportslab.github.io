@@ -152,6 +152,17 @@ Sim.view = async (sport, args) => {
   const sorted = d.teams.slice().sort((a, b) => (a.rank || 999) - (b.rank || 999));
   let aId = args[0] || sorted[0].id, bId = args[1] || sorted[1].id;
   let venue = args[2] === "n" ? "neutral" : bId, N = 20000, line = "", total = "";
+  // prefill the DraftKings spread/total when these two teams have an upcoming game with a posted line
+  const bookFor = (a, b) => (d.schedule || []).find(g => g.state !== "post" && g.mkt &&
+    ((g.home === a && g.away === b) || (g.home === b && g.away === a)));
+  const prefill = () => {
+    const g = bookFor(aId, bId);
+    line = g && g.mkt.spread != null ? String(g.home === aId ? g.mkt.spread : -g.mkt.spread) : "";
+    total = g && g.mkt.total != null ? String(g.mkt.total) : "";
+    if (lineIn) { lineIn.value = line; totIn.value = total; bookTag.textContent = g ? `${g.mkt.book} line filled in` : ""; }
+  };
+  let lineIn, totIn, bookTag;
+  prefill();
   const out = h("div", { style: { marginTop: "16px" } });
   const venueSel = h("select", { class: "in", onchange: e => { venue = e.target.value; } });
   const fillVenues = () => { venueSel.replaceChildren(h("option", { value: "neutral" }, "Neutral site"),
@@ -219,16 +230,17 @@ Sim.view = async (sport, args) => {
     h("p", { class: "lede" }, "Any two teams, any venue. Runs the matchup thousands of times off our power ratings and each team's scoring profile, then projects every key player's stat line."),
     h("div", { class: "card" },
       h("div", { class: "sim-setup" },
-        h("div", { class: "field" }, h("label", {}, "Team A"), sel(aId, v => { if (venue === aId) { venue = v; fillVenues(); } aId = v; })),
+        h("div", { class: "field" }, h("label", {}, "Team A"), sel(aId, v => { if (venue === aId) { venue = v; fillVenues(); } aId = v; prefill(); })),
         h("div", { class: "vs" }, h("button", { class: "btn ghost sm", onclick: swap, title: "Swap" }, "⇄")),
-        h("div", { class: "field" }, h("label", {}, "Team B"), sel(bId, v => { if (venue === bId) { venue = v; fillVenues(); } bId = v; }))),
+        h("div", { class: "field" }, h("label", {}, "Team B"), sel(bId, v => { if (venue === bId) { venue = v; fillVenues(); } bId = v; prefill(); }))),
       h("div", { class: "grid g4", style: { marginTop: "12px", alignItems: "end" } },
         h("div", { class: "field" }, h("label", {}, "Venue"), venueSel),
         h("div", { class: "field" }, h("label", {}, "Simulations"), h("select", { class: "in", onchange: e => N = +e.target.value },
           [1000, 5000, 20000, 50000, 100000].map(n => h("option", { value: n, selected: n === N }, n.toLocaleString())))),
         h("div", { class: "field" }, h("label", {}, `Optional line for Team A`), h("div", { style: { display: "flex", gap: "6px" } },
-          h("input", { class: "in", placeholder: "Spread e.g. -3.5", oninput: e => line = e.target.value }),
-          h("input", { class: "in", placeholder: "Total", oninput: e => total = e.target.value }))),
+          lineIn = h("input", { class: "in", placeholder: "Spread e.g. -3.5", value: line, oninput: e => line = e.target.value }),
+          totIn = h("input", { class: "in", placeholder: "Total", value: total, oninput: e => total = e.target.value })),
+          bookTag = h("div", { class: "small muted", style: { marginTop: "4px" } }, bookFor(aId, bId) ? `${bookFor(aId, bId).mkt.book} line filled in` : "")),
         h("div", { class: "field" }, h("button", { class: "btn", style: { width: "100%" }, onclick: go }, "Simulate ▶")))),
     out);
   go();
