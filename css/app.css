@@ -30,7 +30,7 @@ button, select, input { font: inherit; color: inherit; }
 .top { position: sticky; top: 0; z-index: 20; background: var(--head-bg); color: var(--head-text); border-bottom: 3px solid var(--accent); }
 .top-inner { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; gap: 18px; padding: 10px 16px; }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 17px; letter-spacing: -.02em; white-space: nowrap; }
-.brand-logo { width: 38px; height: 38px; flex: none; }
+.brand-logo { width: 40px; height: 42px; flex: none; object-fit: contain; }
 .brand small { display: block; font-size: 10px; font-weight: 700; letter-spacing: .14em; color: var(--accent); text-transform: uppercase; line-height: 1; }
 .brand b { display: block; line-height: 1.1; }
 .sports { display: flex; gap: 4px; overflow-x: auto; flex: 1; scrollbar-width: none; }
@@ -190,5 +190,5 @@ td.num { font-variant-numeric: tabular-nums; }
 .sport-tile b { display: block; font-size: 16px; }
 .sport-tile span { font-size: 12px; color: #c4c9d1; }
 table.t td.wrap { white-space: normal; min-width: 220px; max-width: 360px; }
-.hero-logo { width: 84px; height: 84px; float: right; margin-left: 16px; }
+.hero-logo { width: 96px; height: 100px; float: right; margin-left: 16px; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,.5)); }
 @media (max-width: 600px) { .brand span.full { display: none; } .hero-logo { width: 60px; height: 60px; } }

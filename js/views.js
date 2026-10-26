@@ -254,7 +254,7 @@ Views.home = async () => {
                     .map(g => ({ ...g, projHome: cfb.leagueAvg + g.margin / 2, projAway: cfb.leagueAvg - g.margin / 2 })) : [];
   const worst = cfb ? cfb.disappoint.slice(0, 5) : [];
   mount(
-    h("div", { class: "hero-home" }, h("img", { class: "hero-logo", src: "img/beaver.svg", alt: "" }), h("h1", {}, "Beavs Knees Sports Lab"),
+    h("div", { class: "hero-home" }, h("img", { class: "hero-logo", src: "img/benny.png", alt: "Benny the Beaver" }), h("h1", {}, "Beavs Knees Sports Lab"),
       h("p", {}, "Our own power ratings and predictions for CFB, NFL, NBA, MLB and NHL - plus live rosters, trade rumors, a trade simulator, a Monte Carlo game simulator, and the CFB recruiting / portal / disappointment boards."),
       h("div", { class: "sport-tiles" }, tiles)),
     cfb ? h("div", { class: "grid g3" },
