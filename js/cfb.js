@@ -51,7 +51,7 @@ CFB.disappoint = async () => {
 
 CFB.recruiting = async () => {
   const [d, r] = await Promise.all([sportData("cfb"), load("cfb_recruiting")]);
-  const years = Object.keys(Object.values(r.history)[0] || {}).sort();
+  const years = [...new Set(Object.values(r.history).flatMap(y => Object.keys(y)))].sort();
   const histRows = Object.entries(r.history).map(([id, yrs]) => {
     const ranks = years.map(y => yrs[y]?.[0] ?? null);
     const valid = ranks.filter(x => x != null);
@@ -66,9 +66,23 @@ CFB.recruiting = async () => {
     { k: "rank", label: "Power #", num: true, asc: true, sort: x => x.t.rank, fmt: x => x.t.rank ?? "–" },
   ];
   const parts = [h("h1", {}, "Recruiting"),
-    h("p", { class: "lede" }, `The ${r.classYear} class board with landing-spot speculation for uncommitted prospects, plus five years of class rankings next to where each program's power rating sits today.`)];
+    h("p", { class: "lede" }, `The ${r.classYear} class board, landing-spot speculation for uncommitted prospects, and every program's class rankings over the years next to where its power rating sits today. Classes are ranked by the 247Sports Composite: each class's score is a weighted sum of its commits' composite ratings, so elite prospects count far more than depth.`)];
+  if (r.teamRanks?.length) {
+    const rk = r.teamRanks.filter(x => x.id && d._byId[x.id]).map(x => ({ ...x, t: team(d, x.id) }));
+    parts.push(h("div", { class: "card tight" },
+      h("div", { class: "card-head" }, h("h2", {}, `${r.classYear} class rankings`), h("span", { class: "muted small" }, r.rankSource || "")),
+      table([
+        { k: "rank", label: "#", num: true, asc: true },
+        { k: "t", label: "Team", sort: x => x.t.name, asc: true, fmt: x => teamLink("cfb", x.t) },
+        { k: "points", label: "Points", num: true, title: "247 Composite team score: weighted sum of every commit's composite rating", fmt: x => fmt.n(x.points, 2) },
+        { k: "commits", label: "Commits", num: true },
+        { k: "five", label: "5★", num: true }, { k: "four", label: "4★", num: true }, { k: "three", label: "3★", num: true },
+        { k: "avg", label: "Avg rating", num: true, title: "Average 247 Composite player rating (0-100)", fmt: x => fmt.n(x.avg, 2) },
+        { k: "pw", label: "Power #", num: true, asc: true, sort: x => x.t.rank, fmt: x => x.t.rank ?? "–" },
+      ], rk, { sort: "rank", asc: true, maxH: "560px" })));
+  }
   if (r.pending) {
-    parts.push(h("div", { class: "note warn" }, `Individual ${r.classYear} recruits and the landing-spot speculation come from the CollegeFootballData API, whose monthly quota is used up. They fill in automatically on the next build after it resets (Nov 1). Class rankings below come from the local database.`));
+    parts.push(h("div", { class: "note warn" }, `Individual ${r.classYear} recruits and the landing-spot speculation come from the CollegeFootballData API, whose monthly quota is used up. They fill in automatically on the first build after it resets (Nov 1). The class rankings above are a dated snapshot of 247Sports' composite page.`));
   } else {
     const open = r.uncommitted.map(x => ({ ...x }));
     parts.push(h("div", { class: "grid g2" },
@@ -80,14 +94,16 @@ CFB.recruiting = async () => {
           { k: "landing", label: "Most likely", nosort: true, fmt: x => h("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap" } },
               x.landing.slice(0, 3).map(l => { const t = team(d, l.id); return h("span", { class: "chip", title: t.name }, logo(t), ` ${t.abbr} ${fmt.pct(l.p)}`); })) },
         ], open, { sort: "rank", asc: true, maxH: "560px" })),
-      h("div", { class: "card tight" }, h("h2", {}, `${r.classYear} team class rankings`),
-        table([{ k: "rank", label: "#", num: true, asc: true }, { k: "team", label: "Team", fmt: x => x.id ? teamLink("cfb", team(d, x.id)) : x.team },
-               { k: "points", label: "Points", num: true, fmt: x => fmt.n(x.points, 1) },
-               { k: "n", label: "Commits", num: true, sort: x => r.commits.filter(c => c.team === x.id).length, fmt: x => r.commits.filter(c => c.team === x.id).length }],
-              r.teamRanks.slice(0, 80), { sort: "rank", asc: true, maxH: "560px" }))));
+      h("div", { class: "card tight" }, h("h2", {}, `Top ${r.classYear} commits`),
+        table([
+          { k: "rank", label: "#", num: true, asc: true },
+          { k: "name", label: "Prospect", asc: true, fmt: x => h("div", {}, h("b", {}, x.name), h("div", { class: "small muted" }, `${x.pos} · ${x.city || ""}, ${x.state || ""}`)) },
+          { k: "stars", label: "★", fmt: x => stars(x.stars) },
+          { k: "team", label: "Committed to", sort: x => team(d, x.team).name, fmt: x => teamLink("cfb", team(d, x.team), { short: true }) },
+        ], r.commits.slice(0, 150), { sort: "rank", asc: true, maxH: "560px" }))));
     parts.push(h("div", { class: "note" }, r.method));
   }
-  parts.push(h("div", { class: "card tight", style: { marginTop: "16px" } }, h("h2", {}, "Class rankings, last five cycles"),
+  parts.push(h("div", { class: "card tight", style: { marginTop: "16px" } }, h("h2", {}, `Class rankings, ${years[0]}-${years[years.length - 1]}`),
     table(histCols, histRows, { sort: "avg", asc: true, maxH: "640px" })));
   mount(...parts);
 };
