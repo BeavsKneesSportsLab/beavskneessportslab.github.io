@@ -92,7 +92,27 @@ function marketBlock(sport, d, g, A, H) {
       !goals && m.spread != null ? h("span", {}, h("b", {}, `${H.abbr || H.short} ${fmtSpread(m.spread)}`)) : null,
       m.total != null ? h("span", {}, `O/U `, h("b", {}, m.total)) : null,
       m.mlA != null ? h("span", {}, `ML `, h("b", {}, `${fmtML(m.mlA)} / ${fmtML(m.mlH)}`)) : null),
-    bits.length ? h("div", { class: "mkt-cmp" }, bits.join(" · ")) : null);
+    bits.length ? h("div", { class: "mkt-cmp" }, bits.join(" · ")) : null,
+    moveLine(m, H, goals), splitsLine(m, H, A));
+}
+function moveLine(m, H, goals) {            // opening line -> current line
+  const o = m.open; if (!o) return null;
+  const parts = [];
+  if (!goals && o.spread != null && m.spread != null) parts.push(o.spread === m.spread ? `${H.abbr} ${fmtSpread(m.spread)} (no move)` : `${H.abbr} ${fmtSpread(o.spread)} → ${fmtSpread(m.spread)}`);
+  if (goals && o.mlH != null && m.mlH != null) parts.push(o.mlH === m.mlH ? `${H.abbr} ${fmtML(m.mlH)} (no move)` : `${H.abbr} ${fmtML(o.mlH)} → ${fmtML(m.mlH)}`);
+  if (o.total != null && m.total != null) parts.push(o.total === m.total ? `O/U ${m.total}` : `O/U ${o.total} → ${m.total}`);
+  return parts.length ? h("div", { class: "mkt-cmp" }, "Opened: ", parts.join(" · ")) : null;
+}
+function splitsLine(m, H, A) {              // share of bets vs share of money, home side / over
+  const s = m.splits; if (!s) return null;
+  const items = [];
+  if (s.spread_home_bets != null) items.push([`Spread`, s.spread_home_bets, s.spread_home_handle, `on ${H.abbr}`]);
+  else if (s.ml_home_bets != null) items.push([`ML`, s.ml_home_bets, s.ml_home_handle, `on ${H.abbr}`]);
+  if (s.over_bets != null) items.push([`Total`, s.over_bets, s.over_handle, "on the over"]);
+  if (!items.length) return null;
+  const sharp = items.some(([, b, mo]) => mo != null && Math.abs(b - mo) >= 15);
+  return h("div", { class: "mkt-cmp" }, sharp ? h("span", { class: "chip warn", title: "Share of money differs from share of bets by 15+ points: bigger bettors disagree with the crowd" }, "💰 money ≠ tickets") : null, " Public: ",
+    items.map(([lab, b, mo, side]) => `${lab} ${Math.round(b)}% of bets / ${Math.round(mo)}% of money ${side}`).join(" · "));
 }
 
 Views.predictions = async (sport) => {
