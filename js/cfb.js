@@ -46,6 +46,7 @@ CFB.disappoint = async () => {
       h("div", { class: "card" }, h("h2", {}, "😬 Most disappointing"), listBad),
       h("div", { class: "card" }, h("h2", {}, "🚀 Biggest overachievers"), listGood)),
     h("div", { class: "card tight", style: { marginTop: "16px" } }, h("h2", {}, "Full board"), tbl),
+    hotSeatCard(d, await load("cfb_extras").catch(() => null)),
     h("div", { class: "note" }, `Through week ${d.asOfWeek}. "Results #" uses only 2026 games (no preseason prior), so it is the purest read of on-field play - and the noisiest early in the year.`));
 };
 
@@ -243,4 +244,48 @@ CFB.playoff = async () => {
     h("div", { class: "card tight", style: { marginTop: "16px" } }, h("div", { class: "card-head" }, h("h2", {}, "Every team"), confSel), tbl),
     h("div", { class: "note" }, "How it works: each simulated season gives every team a season-long rating shock (we don't know anyone's true strength exactly), plays every game with the model's win probabilities, stages conference title games for the top two in each league, ranks teams by a résumé score (rating minus ~6 pts per loss, plus a bonus for a conference title), takes the five best conference champions plus seven at-large teams, and plays the bracket. It's a model of the committee, not the committee."));
   if (matchMedia("(max-width: 900px)").matches) $("#poGrid").style.gridTemplateColumns = "1fr";
+};
+
+function hotSeatCard(d, x) {
+  if (!x?.hotSeat?.length) return null;
+  const rows = x.hotSeat.slice(0, 25).map(c => ({ ...c, t: team(d, c.id) }));
+  const mx = rows[0].score;
+  return h("div", { class: "card tight", style: { marginTop: "16px" } },
+    h("div", { class: "card-head" }, h("h2", {}, "🔥 Coaching hot seat"), h("span", { class: "muted small" }, "Speculative - no buyout or AD-politics data")),
+    table([
+      { k: "t", label: "Team", sort: c => c.t.name, asc: true, fmt: c => teamLink("cfb", c.t) },
+      { k: "coach", label: "Coach", asc: true, fmt: c => h("b", {}, c.coach) },
+      { k: "years", label: "Year", num: true, title: "Season at this school (per ESPN)" },
+      { k: "record", label: "Record", nosort: true },
+      { k: "talentRank", label: "Talent #", num: true, asc: true },
+      { k: "score", label: "Heat", num: true, fmt: c => h("div", { style: { display: "flex", gap: "8px", alignItems: "center", justifyContent: "flex-end" } },
+          h("span", { class: "mono" }, fmt.n(c.score, 2)), h("div", { class: "bar", style: { width: "70px" } }, h("i", { style: { width: `${Math.max(0, 100 * c.score / mx)}%`, background: "var(--bad)" } }))) },
+      { k: "why", label: "Why", nosort: true, cls: "wrap", fmt: c => h("span", { class: "small muted" }, c.why.join(" · ")) },
+    ], rows, { sort: "score" }),
+    h("p", { class: "muted small", style: { padding: "0 16px 12px" } }, "Heat = how far the team trails expectations (disappointment index, flipped) plus pressure for losing with elite talent or a losing record, scaled by tenure: year 1 is protected, years 2-5 are the prove-it window."));
+}
+
+CFB.heisman = async () => {
+  const [d, x] = await Promise.all([sportData("cfb"), load("cfb_extras")]);
+  const rows = x.heisman.map(c => ({ ...c, t: team(d, c.team) }));
+  const mx = rows[0].odds;
+  const lead = rows.slice(0, 3);
+  mount(
+    h("h1", {}, "Heisman Tracker"),
+    h("p", { class: "lede" }, "Who wins it if voting happened today: per-game production, discounted for non-QBs, multiplied by how good the team is, turned into a share of the vote. Injured or inactive players are out of the running."),
+    h("div", { class: "grid g3" }, lead.map((c, i) => h("div", { class: "card heis" + (i === 0 ? " first" : "") },
+      h("div", { class: "kicker" }, ["Front-runner", "2nd", "3rd"][i]),
+      h("div", { class: "team-cell", style: { gap: "12px" } }, c.img ? h("img", { class: "headshot lg", src: c.img, alt: "" }) : logo(c.t, "md"),
+        h("div", {}, h("h2", { style: { margin: 0 } }, c.name), h("div", { class: "muted small" }, `${c.pos} · ${c.t.name} (#${c.t.rank}, ${c.t.record})`))),
+      h("div", { class: "heis-odds" }, fmt.pct(c.odds)), h("div", { class: "small" }, c.line)))),
+    h("div", { class: "card tight", style: { marginTop: "16px" } }, h("h2", {}, "The field"),
+      table([
+        { k: "rank", label: "#", num: true, asc: true, sort: c => -c.odds, fmt: (c, i) => i + 1 },
+        { k: "name", label: "Player", asc: true, fmt: c => h("div", { class: "team-cell" }, c.img ? h("img", { class: "headshot", src: c.img, alt: "", loading: "lazy" }) : h("span", { class: "headshot" }), h("div", {}, h("b", {}, c.name), h("div", { class: "muted small" }, c.pos))) },
+        { k: "t", label: "Team", sort: c => c.t.rank, asc: true, fmt: c => h("span", { class: "team-cell" }, logo(c.t), `${c.t.short} (#${c.t.rank})`) },
+        { k: "line", label: "Season", nosort: true, cls: "wrap", fmt: c => h("span", { class: "small" }, c.line) },
+        { k: "odds", label: "Win share", num: true, fmt: c => h("div", { style: { display: "flex", gap: "8px", alignItems: "center", justifyContent: "flex-end" } },
+            h("div", { class: "bar", style: { width: "80px" } }, h("i", { style: { width: `${100 * c.odds / mx}%` } })), h("b", {}, fmt.pct(c.odds, 1))) },
+      ], rows, { sort: "odds" })),
+    h("div", { class: "note" }, "A heuristic modeled on who actually wins (big-stat QBs on top teams), not a betting price. It knows nothing about narrative, signature games or the last month of the season - which is exactly where Heismans get won."));
 };

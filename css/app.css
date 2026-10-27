@@ -248,3 +248,7 @@ table.t td.wrap { white-space: normal; min-width: 220px; max-width: 360px; }
 .br-col > .seed { background: var(--panel2); }
 .seed-n { font-weight: 800; color: var(--accent); width: 18px; text-align: right; }
 .seed-nm { font-weight: 700; }
+.heis .kicker { color: var(--accent); font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+.heis.first { border-color: var(--accent); }
+.heis-odds { font-size: 34px; font-weight: 800; margin: 8px 0 2px; font-variant-numeric: tabular-nums; }
+.headshot.lg { width: 56px; height: 56px; }
