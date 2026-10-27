@@ -236,3 +236,6 @@ table.t td.wrap { white-space: normal; min-width: 220px; max-width: 360px; }
 .topic p { margin: 0 0 6px; }
 .board-mini { margin-top: 10px; min-height: 200px; }
 .mini-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; gap: 8px; }
+@media (max-width: 1200px) and (min-width: 901px) { .home-lists { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.mvm-strip { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; margin-top: 16px; font-size: 13px; }
+.mvm-strip:hover { border-color: var(--accent); }

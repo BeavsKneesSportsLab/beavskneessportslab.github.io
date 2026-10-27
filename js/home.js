@@ -110,7 +110,8 @@ Views.home = async () => {
     thread) : null;
   if (t) giscusInto(thread, t.term);
 
-  const top = cfb ? cfb.teams.filter(x => x.rank).sort((a, b) => a.rank - b.rank).slice(0, 10) : [];
+  const ranked = cfb ? cfb.teams.filter(x => x.rank).sort((a, b) => a.rank - b.rank) : [];
+  const top = ranked.slice(0, 10), bottom = ranked.slice(-10);
   const s = ledger?.summary;
   const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
   mount(
@@ -122,16 +123,28 @@ Views.home = async () => {
     h("div", { class: "home-grid" },
       h("div", { class: "card" }, h("div", { class: "card-head" }, h("h2", {}, "Top stories"), h("span", { class: "muted small" }, "via ESPN")), storiesBox),
       topicCard),
-    cfb ? h("div", { class: "grid g3", style: { marginTop: "16px" } },
-      h("div", { class: "card" }, h("div", { class: "card-head" }, h("h2", {}, "CFB Top 10"), h("a", { class: "link small", href: "#/cfb/ratings" }, "All →")),
-        top.map(x => h("div", { class: "mini-row" }, h("span", { class: "team-cell" }, h("span", { class: "rank" }, x.rank), logo(x), h("a", { href: `#/cfb/team/${x.id}` }, x.short)),
-          h("span", { class: "mono" }, fmt.sgn(x.rating))))),
-      h("div", { class: "card" }, h("div", { class: "card-head" }, h("h2", {}, "Most disappointing"), h("a", { class: "link small", href: "#/cfb/disappoint" }, "Board →")),
-        cfb.disappoint.slice(0, 6).map(x => { const tt = team(cfb, x.id); return h("div", { class: "mini-row" },
-          h("a", { class: "team-cell", href: `#/cfb/team/${tt.id}` }, logo(tt), tt.short), h("span", { class: "small muted" }, `${x.actW}-${x.gp - x.actW} · exp ${fmt.n(x.expW)} W`)); })),
-      h("div", { class: "card" }, h("div", { class: "card-head" }, h("h2", {}, "Model vs Market"), h("a", { class: "link small", href: "#/cfb/record" }, "Record →")),
-        s && s.n ? [h("div", { class: "mini-row" }, h("span", {}, "CFB games graded"), h("b", {}, s.n)),
-          h("div", { class: "mini-row" }, h("span", {}, "Winner picked (model / book)"), h("b", {}, `${fmt.pct(s.suModel, 1)} / ${fmt.pct(s.suBook, 1)}`)),
-          h("div", { class: "mini-row" }, h("span", {}, "Model side vs close"), h("b", {}, `${s.ats[0]}-${s.ats[1]}-${s.ats[2]}`)),
-          h("p", { class: "muted small" }, "The closing line is the bar to beat. So far it's winning - that's why this page is public.")] : h("div", { class: "empty" }, "Grading starts after the first finals."))) : null);
+    cfb ? h("div", { class: "grid g4 home-lists", style: { marginTop: "16px" } },
+      listCard("CFB Top 10", "#/cfb/ratings", "All →", top.map(x => rankRow(x, x.rating))),
+      listCard("CFB Bottom 10", "#/cfb/ratings", "All →", bottom.map(x => rankRow(x, x.rating))),
+      listCard("😬 Most disappointing", "#/cfb/disappoint", "Board →", cfb.disappoint.slice(0, 10).map(x => expRow(team(cfb, x.id), x))),
+      listCard("🚀 Biggest overachievers", "#/cfb/disappoint", "Board →", cfb.disappoint.slice(-10).reverse().map(x => expRow(team(cfb, x.id), x)))) : null,
+    s && s.n ? h("a", { class: "card mvm-strip", href: "#/cfb/record" },
+      h("b", {}, "Model vs Market"),
+      h("span", {}, `${s.n} CFB games graded`),
+      h("span", {}, "Winner picked ", h("b", {}, `${fmt.pct(s.suModel, 1)}`), " vs book ", h("b", {}, fmt.pct(s.suBook, 1))),
+      h("span", {}, "Model side vs close ", h("b", {}, `${s.ats[0]}-${s.ats[1]}-${s.ats[2]}`)),
+      h("span", { class: "link" }, "Full record →")) : null);
 };
+
+function listCard(title, href, linkTxt, rows) {
+  return h("div", { class: "card" }, h("div", { class: "card-head" }, h("h2", {}, title), h("a", { class: "link small", href }, linkTxt)), rows);
+}
+function rankRow(x, rating) {
+  return h("div", { class: "mini-row" }, h("span", { class: "team-cell" }, h("span", { class: "rank" }, x.rank), logo(x), h("a", { href: `#/cfb/team/${x.id}` }, x.short)),
+    h("span", { class: "mono" }, fmt.sgn(rating)));
+}
+function expRow(t, x) {        // record vs. wins the preseason ratings expected, with the index
+  return h("div", { class: "mini-row" }, h("a", { class: "team-cell", href: `#/cfb/team/${t.id}` }, logo(t), t.short),
+    h("span", { class: "small muted", title: `Talent #${x.talentRank} · preseason #${x.preRank} → now #${x.curRank} on results` },
+      `${x.actW}-${x.gp - x.actW} · exp ${fmt.n(x.expW)} `, h("b", { class: x.index < 0 ? "neg" : "pos" }, fmt.sgn(x.index, 2))));
+}
