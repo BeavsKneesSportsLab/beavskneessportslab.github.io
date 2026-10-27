@@ -282,34 +282,6 @@ function shade(hex) {
   return `#${f(n >> 16)}${f((n >> 8) & 255)}${f(n & 255)}`;
 }
 
-/* ---------- home ---------- */
-Views.home = async () => {
-  const meta = await load("meta").catch(() => ({}));
-  const cfb = await sportData("cfb").catch(() => null);
-  const tiles = Object.entries(SPORTS).map(([k, s]) => h("a", { class: "sport-tile", href: `#/${k}/${k === "cfb" ? "ratings" : "predictions"}` },
-    h("b", {}, s.full, s.featured ? " ★" : ""), h("span", {}, meta[k] ? `Built ${fmt.ago(meta[k].built)}` : "")));
-  const top = cfb ? cfb.teams.filter(t => t.rank).sort((a, b) => a.rank - b.rank).slice(0, 10) : [];
-  const big = cfb ? cfb.predictions.filter(g => (team(cfb, g.home).rank || 99) <= 30 && (team(cfb, g.away).rank || 99) <= 30)
-                    .sort((a, b) => Math.abs(a.pHome - .5) - Math.abs(b.pHome - .5)).slice(0, 6)
-                    .map(g => ({ ...g, projHome: cfb.leagueAvg + g.margin / 2, projAway: cfb.leagueAvg - g.margin / 2 })) : [];
-  const worst = cfb ? cfb.disappoint.slice(0, 5) : [];
-  mount(
-    h("div", { class: "hero-home" }, h("img", { class: "hero-logo", src: "img/benny.png", alt: "Benny the Beaver" }), h("h1", {}, "Beavs Knees Sports Lab"),
-      h("p", {}, "Our own power ratings and predictions for CFB, NFL, NBA, MLB and NHL - plus live rosters, trade rumors, a trade simulator, a Monte Carlo game simulator, and the CFB recruiting / portal / disappointment boards."),
-      h("div", { class: "sport-tiles" }, tiles)),
-    cfb ? h("div", { class: "grid g3" },
-      h("div", { class: "card" }, h("div", { class: "card-head" }, h("h2", {}, "CFB Top 10"), h("a", { class: "link small", href: "#/cfb/ratings" }, "All 138 →")),
-        top.map(t => h("div", { style: { display: "flex", justifyContent: "space-between", padding: "5px 0" } },
-          h("span", { class: "team-cell" }, h("span", { class: "rank" }, t.rank), logo(t), h("a", { href: `#/cfb/team/${t.id}` }, t.short)),
-          h("span", { class: "mono" }, fmt.sgn(t.rating))))),
-      h("div", { class: "card", style: { gridColumn: "span 1" } }, h("div", { class: "card-head" }, h("h2", {}, `Week ${cfb.upcomingWeek}: closest big games`), h("a", { class: "link small", href: "#/cfb/predictions" }, "All →")),
-        big.length ? big.map(g => { const H = team(cfb, g.home), A = team(cfb, g.away); return h("a", { href: `#/cfb/sim/${g.away}/${g.home}${g.neutral ? "/n" : ""}`, style: { display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--line)" } },
-          h("span", {}, `${A.short} @ ${H.short}`), h("b", {}, spreadText("cfb", cfb, g))); }) : h("div", { class: "empty" }, "None this week.")),
-      h("div", { class: "card" }, h("div", { class: "card-head" }, h("h2", {}, "Most disappointing"), h("a", { class: "link small", href: "#/cfb/disappoint" }, "Full board →")),
-        worst.map(x => { const t = team(cfb, x.id); return h("div", { style: { display: "flex", justifyContent: "space-between", padding: "5px 0" } },
-          h("a", { class: "team-cell", href: `#/cfb/team/${t.id}` }, logo(t), t.short), h("span", { class: "small muted" }, `${x.actW}-${x.gp - x.actW} · exp ${fmt.n(x.expW)} W`)); }))) : errorBox(new Error("cfb.json missing")));
-};
-
 /* ---------- model vs closing line ---------- */
 Views.record = async (sport) => {
   const [d, L] = await Promise.all([sportData(sport), load(`ledger_${sport}`)]);
