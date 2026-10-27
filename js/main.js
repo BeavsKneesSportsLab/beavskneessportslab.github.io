@@ -40,4 +40,7 @@ async function route() {
   });
 })();
 window.addEventListener("hashchange", route);
+window.addEventListener("hashchange", () => {        // GoatCounter: count each tab as a page view
+  try { window.goatcounter?.count?.({ path: location.pathname + location.hash.replace(/^#/, "") || "/" }); } catch {}
+});
 route();
