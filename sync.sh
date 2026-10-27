@@ -7,7 +7,14 @@ set -e
 cd "$(dirname "$0")"
 git fetch -q origin
 if git merge-base HEAD origin/main >/dev/null 2>&1; then
-  git pull -q --rebase --autostash origin main && echo "up to date"
+  git pull -q --rebase --autostash origin main
+  # an autostash that re-applies with conflicts leaves marker-filled files behind; never report success
+  if [ -n "$(git diff --name-only --diff-filter=U)" ]; then
+    echo "SYNC CONFLICT in: $(git diff --name-only --diff-filter=U | tr '\n' ' ')"
+    echo "Local changes are in 'git stash list'. Resolve (for data/ files, rebuild them) before committing."
+    exit 1
+  fi
+  echo "up to date"
   exit 0
 fi
 if [ -n "$(git status --porcelain -- . ':!data')" ] || [ -n "$(git diff --name-only HEAD origin/main -- . ':!data')" ]; then
