@@ -362,3 +362,39 @@ Views.board = async (sport) => {
     h("div", { class: "toolbar" }, seg(threads, cur, v => { cur = v; draw(); })),
     box);
 };
+
+/* ---------- pro season projections ---------- */
+Views.projections = async (sport) => {
+  const [d, p] = await Promise.all([sportData(sport), load(`${sport}_season`)]);
+  const rows = p.teams.map(x => ({ ...x, t: team(d, x.id) }));
+  const pct = v => v >= 0.995 && v < 1 ? ">99%" : v > 0 && v < 0.005 ? "<1%" : fmt.pct(v);
+  const confs = [...new Set(rows.map(x => x.conf))].sort();
+  const confLabel = c => sport === "nfl" ? c : `${c}ern Conference`;
+  const titleWord = { nfl: "Super Bowl", nba: "NBA title", nhl: "Stanley Cup" }[sport];
+  const cards = h("div", { class: "grid g2" }, confs.map(c => {
+    const cr = rows.filter(x => x.conf === c).sort((a, b) => b.conf_title - a.conf_title).slice(0, 6), mx = cr[0].conf_title;
+    return h("div", { class: "card" }, h("h2", {}, `${confLabel(c)}: win the conference`),
+      cr.map(x => h("div", { class: "mini-row" }, h("a", { class: "team-cell", href: `#/${sport}/team/${x.id}` }, logo(x.t), x.t.short),
+        h("span", { style: { display: "flex", gap: "8px", alignItems: "center" } }, h("div", { class: "bar", style: { width: "80px" } }, h("i", { style: { width: `${100 * x.conf_title / mx}%` } })),
+          h("b", { style: { width: "44px", textAlign: "right" } }, pct(x.conf_title))))));
+  }));
+  const tbl = table([
+    { k: "t", label: "Team", sort: x => x.t.name, asc: true, fmt: x => teamLink(sport, x.t) },
+    { k: "div", label: "Division", asc: true },
+    { k: "w", label: "Proj. record", fmt: x => sport === "nhl" ? `${fmt.n(x.w, 0)}-${fmt.n(x.l, 0)}-${fmt.n(x.otl, 0)}` : `${fmt.n(x.w, 1)}-${fmt.n(x.l, 1)}` },
+    sport === "nhl" ? { k: "pts", label: "Proj. pts", num: true, fmt: x => fmt.n(x.pts, 0) } : null,
+    { k: "playoffs", label: "Playoffs", num: true, fmt: x => h("b", {}, pct(x.playoffs)) },
+    sport === "nba" ? { k: "playin", label: "Play-in", num: true, title: "Finishes 7th-10th in the conference", fmt: x => pct(x.playin) } : null,
+    { k: "div_title", label: "Win division", num: true, fmt: x => pct(x.div_title) },
+    { k: "top_seed", label: sport === "nfl" ? "#1 seed (bye)" : sport === "nba" ? "#1 seed" : "Top div. winner", num: true, fmt: x => pct(x.top_seed) },
+    { k: "conf_title", label: "Win conference", num: true, fmt: x => pct(x.conf_title) },
+    { k: "title", label: titleWord, num: true, fmt: x => h("b", { class: x.title > 0.08 ? "pos" : "" }, pct(x.title)) },
+  ].filter(Boolean), rows, { sort: "title" });
+  mount(
+    h("h1", {}, `${SPORTS[sport].full} Season Odds`),
+    h("p", { class: "lede" }, `${p.sims.toLocaleString()} simulations of the remaining ${p.remaining} games and the full playoffs, off our power ratings (injury adjustments on the next week of games). ` +
+      { nfl: "Format: 4 division winners + 3 wild cards per conference, #1 seed bye, reseeding.", nba: "Format: top 6 + play-in per conference, best-of-7 series.", nhl: "Format: top 3 per division + 2 wild cards per conference, division bracket, best-of-7." }[sport]),
+    cards,
+    h("div", { class: "card tight", style: { marginTop: "16px" } }, h("h2", {}, "Every team"), tbl),
+    h("div", { class: "note" }, "Each simulated season gives every team a season-long rating shock (true strength is uncertain), plays every game off the model's win probability, and runs the real playoff format. Tiebreakers are simplified to record, then a coin flip weighted by strength."));
+};

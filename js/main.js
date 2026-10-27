@@ -1,7 +1,7 @@
 /* main.js — router + nav. Routes: #/  #/{sport}/{tab}[/args...] */
 const ROUTES = {
   ratings: s => Views.ratings(s), predictions: s => Views.predictions(s), standings: s => Views.standings(s),
-  rumors: s => Views.rumors(s), record: s => Views.record(s), board: s => Views.board(s), teams: s => Views.teams(s), team: (s, a) => Views.team(s, a[0]),
+  rumors: s => Views.rumors(s), record: s => Views.record(s), projections: s => Views.projections(s), board: s => Views.board(s), teams: s => Views.teams(s), team: (s, a) => Views.team(s, a[0]),
   sim: (s, a) => Sim.view(s, a), trade: (s, a) => Trade.view(s, a),
   disappoint: () => CFB.disappoint(), playoff: () => CFB.playoff(), recruiting: () => CFB.recruiting(), portal: () => CFB.portal(),
 };

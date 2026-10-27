@@ -8,9 +8,9 @@ const SPORTS = {
   mlb: { name: "MLB", full: "MLB", path: "baseball/mlb" },
   nhl: { name: "NHL", full: "NHL", path: "hockey/nhl" },
 };
-const PRO_TABS = [["ratings", "Power Ratings"], ["predictions", "Predictions"], ["record", "Model vs Market"], ["standings", "Standings"],
+const PRO_TABS = [["ratings", "Power Ratings"], ["predictions", "Predictions"], ["projections", "Season Odds"], ["record", "Model vs Market"], ["standings", "Standings"],
                   ["rumors", "Trade Rumors"], ["trade", "Trade Simulator"], ["sim", "Game Sim"], ["teams", "Teams"], ["board", "Message Board"]];
-for (const k of ["nfl", "nba", "mlb", "nhl"]) SPORTS[k].tabs = PRO_TABS;
+for (const k of ["nfl", "nba", "mlb", "nhl"]) SPORTS[k].tabs = PRO_TABS.filter(([t]) => k !== "mlb" || t !== "projections");
 
 const _cache = {};
 function load(name) {
