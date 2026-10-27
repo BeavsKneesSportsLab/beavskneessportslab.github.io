@@ -18,12 +18,12 @@
 <meta name="twitter:title" content="Beavs Knees Sports Lab">
 <meta name="twitter:description" content="Power ratings, predictions, playoff odds, game + trade simulators. CFB first.">
 <meta name="twitter:image" content="https://beavskneessportslab.github.io/img/og-card.png">
-<link rel="icon" href="img/benny-128.png" type="image/png">
-<link rel="apple-touch-icon" href="img/benny-128.png">
+<link rel="icon" href="img/beaver-face-128.png" type="image/png">
+<link rel="apple-touch-icon" href="img/beaver-face-256.png">
 <script>
 /* self-update: browsers may serve a cached copy of this page for ~10 min after a deploy, still pointing at
    old script versions. version.txt is fetched uncached; if it's newer, refresh the cache and reload once. */
-(function () { var BUILD="202610270932";
+(function () { var BUILD="202610271310";
   try { fetch("version.txt?" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {
     t = (t || "").trim(); var k = "bk-reloaded-" + t;
     if (t && t !== BUILD && !sessionStorage.getItem(k)) { sessionStorage.setItem(k, "1");
@@ -33,12 +33,12 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=202610270932">
+<link rel="stylesheet" href="css/app.css?v=202610271310">
 </head>
 <body>
 <header class="top">
   <div class="top-inner">
-    <a class="brand" href="#/"><img class="brand-logo" src="img/benny-128.png" alt="Benny the Beaver"><span class="full"><small>Beavs Knees</small><b>Sports Lab</b></span></a>
+    <a class="brand" href="#/"><img class="brand-logo" src="img/beaver-face-128.png" alt="Beavs Knees beaver"><span class="full"><small>Beavs Knees</small><b>Sports Lab</b></span></a>
     <nav class="sports" id="sportNav"></nav>
     <button class="theme-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">◐</button>
   </div>
@@ -47,15 +47,15 @@
 <div id="staleBanner" class="stale" hidden></div>
 <main id="app"><div class="loading">Loading…</div></main>
 <footer class="foot" id="foot"></footer>
-<script src="js/core.js?v=202610270932"></script>
-<script src="js/views.js?v=202610270932"></script>
-<script src="js/home.js?v=202610270932"></script>
-<script src="js/cfb.js?v=202610270932"></script>
-<script src="js/sim.js?v=202610270932"></script>
-<script src="js/players.js?v=202610270932"></script>
-<script src="js/pickem.js?v=202610270932"></script>
-<script src="js/trade.js?v=202610270932"></script>
-<script src="js/main.js?v=202610270932"></script>
+<script src="js/core.js?v=202610271310"></script>
+<script src="js/views.js?v=202610271310"></script>
+<script src="js/home.js?v=202610271310"></script>
+<script src="js/cfb.js?v=202610271310"></script>
+<script src="js/sim.js?v=202610271310"></script>
+<script src="js/players.js?v=202610271310"></script>
+<script src="js/pickem.js?v=202610271310"></script>
+<script src="js/trade.js?v=202610271310"></script>
+<script src="js/main.js?v=202610271310"></script>
 <script data-goatcounter="https://beavskneessportslab.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </body>
 </html>

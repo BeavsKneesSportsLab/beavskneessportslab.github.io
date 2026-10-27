@@ -289,3 +289,6 @@ table.cmp td { font-size: 14px; } table.cmp td:first-child { text-align: right; 
   main { padding: 14px 12px 32px; }
   h1 { font-size: 22px; }
 }
+.home-lists { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important; }
+.brand-logo { border-radius: 50%; }
+.home-logo { width: 84px !important; height: 84px !important; border-radius: 16px; object-fit: cover; border: 2px solid var(--accent); box-shadow: 0 6px 18px rgba(0,0,0,.45); }

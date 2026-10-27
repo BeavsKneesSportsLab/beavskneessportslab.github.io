@@ -267,25 +267,101 @@ function hotSeatCard(d, x) {
 
 CFB.heisman = async () => {
   const [d, x] = await Promise.all([sportData("cfb"), load("cfb_extras")]);
-  const rows = x.heisman.map(c => ({ ...c, t: team(d, c.team) }));
-  const mx = rows[0].odds;
-  const lead = rows.slice(0, 3);
+  const H = x.heisman;
+  const rows = H.board.map(c => ({ ...c, t: team(d, c.team) }));
+  const sl = H.sleepers.map(c => ({ ...c, t: team(d, c.team) }));
+  const mx = Math.max(...rows.map(r => r.market));
+  const who = c => h("div", { class: "team-cell" }, c.img ? h("img", { class: "headshot", src: c.img, alt: "", loading: "lazy" }) : h("span", { class: "headshot" }),
+    h("div", {}, c.id ? h("a", { class: "plink", href: `#/cfb/player/${c.team}/${c.id}` }, h("b", {}, c.name)) : h("b", {}, c.name),
+      h("div", { class: "muted small" }, `${c.pos || ""} · ${c.t.short}${c.t.rank ? ` (#${c.t.rank}, ${c.t.record})` : ""}`)));
   mount(
     h("h1", {}, "Heisman Tracker"),
-    h("p", { class: "lede" }, "Who wins it if voting happened today: per-game production, discounted for non-QBs, multiplied by how good the team is, turned into a share of the vote. Injured or inactive players are out of the running."),
-    h("div", { class: "grid g3" }, lead.map((c, i) => h("div", { class: "card heis" + (i === 0 ? " first" : "") },
+    h("p", { class: "lede" }, "The race as the betting markets see it, with our model's take beside it. The model compares each player to others at his own position (so receivers can rank), then adds team success. It knows nothing about narrative or signature moments, which is exactly where Heismans get won."),
+    h("div", { class: "grid g3" }, rows.slice(0, 3).map((c, i) => h("div", { class: "card heis" + (i === 0 ? " first" : "") },
       h("div", { class: "kicker" }, ["Front-runner", "2nd", "3rd"][i]),
-      h("div", { class: "team-cell", style: { gap: "12px" } }, c.img ? h("img", { class: "headshot lg", src: c.img, alt: "" }) : logo(c.t, "md"),
-        h("div", {}, h("h2", { style: { margin: 0 } }, c.name), h("div", { class: "muted small" }, `${c.pos} · ${c.t.name} (#${c.t.rank}, ${c.t.record})`))),
-      h("div", { class: "heis-odds" }, fmt.pct(c.odds)), h("div", { class: "small" }, c.line)))),
-    h("div", { class: "card tight", style: { marginTop: "16px" } }, h("h2", {}, "The field"),
+      who(c),
+      h("div", { class: "heis-odds" }, fmt.pct(c.market)), h("div", { class: "small muted" }, `market · our model ${fmt.pct(c.model)} (#${c.modelRank ?? "–"})`),
+      h("div", { class: "small", style: { marginTop: "6px" } }, c.line)))),
+    h("div", { class: "card tight", style: { marginTop: "16px" } },
+      h("div", { class: "card-head" }, h("h2", {}, "The race"), h("span", { class: "muted small" }, "Market as of ", H.asOf, " · ", h("a", { class: "link", href: H.sourceUrl, target: "_blank", rel: "noopener" }, "source"))),
       table([
-        { k: "rank", label: "#", num: true, asc: true, sort: c => -c.odds, fmt: (c, i) => i + 1 },
-        { k: "name", label: "Player", asc: true, fmt: c => h("div", { class: "team-cell" }, c.img ? h("img", { class: "headshot", src: c.img, alt: "", loading: "lazy" }) : h("span", { class: "headshot" }), h("div", {}, h("a", { class: "plink", href: `#/cfb/player/${c.team}/${c.id}` }, h("b", {}, c.name)), h("div", { class: "muted small" }, c.pos))) },
-        { k: "t", label: "Team", sort: c => c.t.rank, asc: true, fmt: c => h("span", { class: "team-cell" }, logo(c.t), `${c.t.short} (#${c.t.rank})`) },
+        { k: "who", label: "Player", sort: c => c.name, asc: true, fmt: who },
+        { k: "line", label: "Season", nosort: true, cls: "wrap", fmt: c => h("span", { class: "small" }, c.line, c.out ? h("span", { class: "chip bad", style: { marginLeft: "6px" } }, "Out") : null) },
+        { k: "market", label: "Market", num: true, fmt: c => h("div", { style: { display: "flex", gap: "8px", alignItems: "center", justifyContent: "flex-end" } },
+            h("div", { class: "bar", style: { width: "70px" } }, h("i", { style: { width: `${100 * c.market / mx}%` } })), h("b", {}, fmt.pct(c.market, 1))) },
+        { k: "model", label: "Our model", num: true, title: "Our model's vote share", fmt: c => fmt.pct(c.model, 1) },
+        { k: "modelRank", label: "Model #", num: true, asc: true },
+      ], rows, { sort: "market" })),
+    h("div", { class: "card tight", style: { marginTop: "16px" } }, h("h2", {}, "🔍 Model sleepers"),
+      h("p", { class: "muted small", style: { padding: "0 16px" } }, "Players our model rates highly whom the market isn't pricing. Usually that means team record or national attention is holding them back."),
+      table([
+        { k: "modelRank", label: "Model #", num: true, asc: true },
+        { k: "who", label: "Player", nosort: true, fmt: who },
         { k: "line", label: "Season", nosort: true, cls: "wrap", fmt: c => h("span", { class: "small" }, c.line) },
-        { k: "odds", label: "Win share", num: true, fmt: c => h("div", { style: { display: "flex", gap: "8px", alignItems: "center", justifyContent: "flex-end" } },
-            h("div", { class: "bar", style: { width: "80px" } }, h("i", { style: { width: `${100 * c.odds / mx}%` } })), h("b", {}, fmt.pct(c.odds, 1))) },
-      ], rows, { sort: "odds" })),
-    h("div", { class: "note" }, "A heuristic modeled on who actually wins (big-stat QBs on top teams), not a betting price. It knows nothing about narrative, signature games or the last month of the season - which is exactly where Heismans get won."));
+        { k: "model", label: "Model share", num: true, fmt: c => fmt.pct(c.model, 1) },
+      ], sl, { sort: "modelRank", asc: true })),
+    h("div", { class: "note" }, H.source + ". Market numbers are refreshed weekly; between refreshes they can lag a big Saturday."));
+};
+
+
+/* ---------- the Beavs Knees Poll (Parker's top 25) ---------- */
+function moveChip(r) {
+  if (r.prev == null) return h("span", { class: "chip accent" }, "NEW");
+  const d = r.prev - r.rank;
+  return d === 0 ? h("span", { class: "muted small" }, "–") : h("b", { class: d > 0 ? "pos" : "neg" }, `${d > 0 ? "▲" : "▼"}${Math.abs(d)}`);
+}
+CFB.poll = async () => {
+  const [d, p] = await Promise.all([sportData("cfb"), load("cfb_poll")]);
+  let wi = p.weeks.length - 1;
+  const body = h("div");
+  const draw = () => {
+    const w = p.weeks[wi], prevW = p.weeks[wi - 1];
+    const rows = w.top25.map(r => ({ ...r, t: r.id ? team(d, r.id) : { name: r.entered, short: r.entered } }));
+    const inNow = new Set(w.top25.map(r => r.id));
+    const dropped = prevW ? prevW.top25.filter(r => r.id && !inNow.has(r.id)).map(r => team(d, r.id)) : [];
+    const movers = rows.filter(r => r.prev != null).sort((a, b) => (b.prev - b.rank) - (a.prev - a.rank));
+    const tbl = table([
+      { k: "rank", label: "#", num: true, asc: true, fmt: r => h("b", { class: "poll-rank" }, r.rank) },
+      { k: "t", label: "Team", nosort: true, fmt: r => r.id ? teamLink("cfb", r.t) : h("span", { class: "neg" }, r.entered) },
+      { k: "rec", label: "Record", nosort: true, fmt: r => r.t.record || "–" },
+      { k: "mv", label: wi ? "vs last week" : "", nosort: true, fmt: r => wi ? moveChip(r) : "" },
+      { k: "model", label: "Our model #", num: true, title: "Where our power rating ranks this team", fmt: r => r.model ?? "–" },
+      { k: "gap", label: "Poll vs model", num: true, nosort: true, title: "Positive = you rank them higher than the model does",
+        fmt: r => r.model == null ? "–" : h("span", { class: r.model - r.rank > 5 ? "pos" : r.rank - r.model > 5 ? "neg" : "muted" }, fmt.sgn(r.model - r.rank, 0)) },
+    ], rows, { sort: "rank", asc: true });
+    body.replaceChildren(
+      h("div", { class: "grid", style: { gridTemplateColumns: "minmax(0,1.6fr) minmax(0,1fr)" }, id: "pollGrid" },
+        h("div", { class: "card tight" }, h("div", { class: "card-head" }, h("h2", {}, `Week ${w.week}`), h("span", { class: "muted small" }, "Ranked by Parker")), tbl),
+        h("div", { class: "grid", style: { alignContent: "start" } },
+          w.firstOut.length ? h("div", { class: "card" }, h("h2", {}, "First 4 out"),
+            w.firstOut.map((r, i) => h("div", { class: "mini-row" }, h("span", { class: "team-cell" }, h("span", { class: "rank" }, 26 + i), r.id ? [logo(team(d, r.id)), h("a", { href: `#/cfb/team/${r.id}` }, team(d, r.id).short)] : r.entered),
+              h("span", { class: "muted small" }, r.id ? team(d, r.id).record : "")))) : null,
+          movers.length ? h("div", { class: "card" }, h("h2", {}, "Biggest moves"),
+            [...movers.slice(0, 3), ...movers.slice(-3).reverse()].filter((r, i, a) => a.indexOf(r) === i && r.prev !== r.rank).map(r =>
+              h("div", { class: "mini-row" }, h("span", { class: "team-cell" }, logo(r.t), r.t.short), h("span", {}, `#${r.prev} → #${r.rank} `, moveChip(r))))) : null,
+          dropped.length ? h("div", { class: "card" }, h("h2", {}, "Dropped out"), h("p", { class: "muted" }, dropped.map(t => t.short).join(" · "))) : null,
+          h("div", { class: "card" }, h("h2", {}, "You vs the model"), h("p", { class: "muted small" }, "Where your poll and our power rating disagree most this week."),
+            rows.filter(r => r.model != null).sort((a, b) => Math.abs(b.model - b.rank) - Math.abs(a.model - a.rank)).slice(0, 5).map(r =>
+              h("div", { class: "mini-row" }, h("span", { class: "team-cell" }, logo(r.t), r.t.short), h("span", { class: "small" }, `You #${r.rank} · model #${r.model}`)))))),
+      history());
+    if (matchMedia("(max-width: 900px)").matches) $("#pollGrid").style.gridTemplateColumns = "1fr";
+  };
+  const history = () => {
+    const ids = [...new Set(p.weeks.flatMap(w => w.top25.map(r => r.id)).filter(Boolean))];
+    const rows = ids.map(id => ({ id, t: team(d, id), ranks: p.weeks.map(w => w.top25.find(r => r.id === id)?.rank ?? null) }));
+    const last = rows.map(r => r.ranks[r.ranks.length - 1]);
+    return h("div", { class: "card tight", style: { marginTop: "16px" } }, h("h2", {}, "Poll history"),
+      table([
+        { k: "t", label: "Team", sort: r => r.t.name, asc: true, fmt: r => teamLink("cfb", r.t) },
+        ...p.weeks.map((w, i) => ({ k: "w" + w.week, label: `Wk ${w.week}`, num: true, asc: true, sort: r => r.ranks[i] ?? 99, fmt: r => r.ranks[i] ?? h("span", { class: "muted" }, "–") })),
+        { k: "weeks", label: "Weeks ranked", num: true, sort: r => r.ranks.filter(x => x != null).length, fmt: r => r.ranks.filter(x => x != null).length },
+      ], rows, { sort: "w" + p.weeks[p.weeks.length - 1].week, asc: true, maxH: "560px" }));
+  };
+  mount(
+    h("div", { class: "card-head" }, h("div", {}, h("h1", {}, "🦫 The Beavs Knees Poll"),
+      h("p", { class: "lede", style: { margin: 0 } }, "Our own weekly top 25, voted by a committee of one. Compared against what our power model thinks.")),
+      h("div", {}, seg(p.weeks.map((w, i) => [i, `Wk ${w.week}`]), wi, v => { wi = v; draw(); }))),
+    p.issues?.length ? h("div", { class: "note warn" }, "Poll data notes: ", p.issues.join(" · ")) : null,
+    body);
+  draw();
 };

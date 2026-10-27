@@ -88,7 +88,7 @@ function giscusInto(box, term) {
 Views.home = async () => {
   clearInterval(_homeTimer);
   const home = await load("home").catch(() => ({ games: [], stories: [], topic: null }));
-  const [cfb, ledger] = await Promise.all([sportData("cfb").catch(() => null), load("ledger_cfb").catch(() => null)]);
+  const [cfb, ledger, poll] = await Promise.all([sportData("cfb").catch(() => null), load("ledger_cfb").catch(() => null), load("cfb_poll").catch(() => null)]);
   const gamesBox = h("div", { class: "fg-grid" });
   const drawGames = live => gamesBox.replaceChildren(...(home.games.length
     ? home.games.map((g, i) => featuredCard(g, live, i === 0))
@@ -115,7 +115,7 @@ Views.home = async () => {
   const s = ledger?.summary;
   const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
   mount(
-    h("div", { class: "home-head" }, h("img", { class: "home-logo", src: "img/benny.png", alt: "" }),
+    h("div", { class: "home-head" }, h("img", { class: "home-logo", src: "img/beaver-full.jpg", alt: "" }),
       h("div", {}, h("h1", {}, "Beavs Knees Sports Lab"), h("div", { class: "muted" }, today)),
       h("div", { class: "home-links" }, HOME_SPORTS.map(k => h("a", { class: "chip", href: `#/${k}/${k === "cfb" ? "ratings" : "predictions"}` }, SPORTS[k].name)))),
     h("section", {}, h("div", { class: "card-head" }, h("h2", {}, "Today's biggest games"),
@@ -131,7 +131,9 @@ Views.home = async () => {
         h("p", { class: "otd-text" }, f.text),
         h("div", { class: "muted small" }, f.detail, f.link ? [" · ", h("a", { class: "link", href: f.link, target: "_blank", rel: "noopener" }, "Box score →")] : null))))) : null,
     cfb ? h("div", { class: "grid g4 home-lists", style: { marginTop: "16px" } },
-      listCard("CFB Top 10", "#/cfb/ratings", "All →", top.map(x => rankRow(x, x.rating))),
+      poll ? listCard(`🦫 Beavs Knees Poll · Wk ${poll.weeks.at(-1).week}`, "#/cfb/poll", "Full poll →", poll.weeks.at(-1).top25.slice(0, 10).filter(r => r.id).map(r => {
+        const t = team(cfb, r.id); return h("div", { class: "mini-row" }, h("span", { class: "team-cell" }, h("span", { class: "rank" }, r.rank), logo(t), h("a", { href: `#/cfb/team/${t.id}` }, t.short)), moveChip(r)); })) : null,
+      listCard("Model Top 10", "#/cfb/ratings", "All →", top.map(x => rankRow(x, x.rating))),
       listCard("CFB Bottom 10", "#/cfb/ratings", "All →", bottom.map(x => rankRow(x, x.rating))),
       listCard("😬 Most disappointing", "#/cfb/disappoint", "Board →", cfb.disappoint.slice(0, 10).map(x => expRow(team(cfb, x.id), x))),
       listCard("🚀 Biggest overachievers", "#/cfb/disappoint", "Board →", cfb.disappoint.slice(-10).reverse().map(x => expRow(team(cfb, x.id), x)))) : null,
