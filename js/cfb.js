@@ -195,3 +195,52 @@ CFB.teamExtras = async (d, id) => {
   }
   return out;
 };
+
+CFB.playoff = async () => {
+  const [d, p] = await Promise.all([sportData("cfb"), load("cfb_playoff")]);
+  const rows = p.teams.map(x => ({ ...x, t: team(d, x.id) }));
+  const pct = (v, dp = 0) => v >= 0.995 && v < 1 ? ">99%" : v > 0 && v < 0.005 ? "<1%" : fmt.pct(v, dp);
+  const bar = (v, max = 1) => h("div", { class: "bar", style: { width: "80px" } }, h("i", { style: { width: `${100 * v / max}%` } }));
+  const seedCard = b => { const t = team(d, b.id), x = rows.find(r => r.id === b.id);
+    return h("a", { class: "seed", href: `#/cfb/team/${t.id}` }, h("span", { class: "seed-n" }, b.seed), logo(t), h("span", { class: "seed-nm" }, t.short),
+      b.auto ? h("span", { class: "chip", title: "Projected conference champion (auto-bid)" }, "AQ") : null, h("span", { class: "muted small" }, pct(x.cfp))); };
+  const B = p.bracket;
+  const bracket = h("div", { class: "card" }, h("div", { class: "card-head" }, h("h2", {}, "Projected bracket"), h("span", { class: "muted small" }, "Seeds = average simulated seed among the projected field")),
+    h("div", { class: "bracket" },
+      h("div", { class: "br-col" }, h("h3", {}, "First-round byes"), B.slice(0, 4).map(seedCard)),
+      h("div", { class: "br-col" }, h("h3", {}, "First round (higher seed hosts)"),
+        [[4, 11], [5, 10], [6, 9], [7, 8]].map(([a, b]) => h("div", { class: "br-game" }, seedCard(B[a]), h("span", { class: "muted small", style: { padding: "0 8px" } }, "vs"), seedCard(B[b]))))));
+  const titleTop = rows.slice().sort((a, b) => b.title - a.title).slice(0, 12), tmax = titleTop[0].title;
+  const titleCard = h("div", { class: "card" }, h("h2", {}, "National title odds"),
+    titleTop.map(x => h("div", { class: "mini-row" }, h("a", { class: "team-cell", href: `#/cfb/team/${x.id}` }, logo(x.t), x.t.short),
+      h("span", { style: { display: "flex", alignItems: "center", gap: "8px" } }, bar(x.title, tmax), h("b", { style: { width: "48px", textAlign: "right" } }, pct(x.title, 1))))));
+  const confs = [...new Set(rows.map(x => x.conf))].filter(c => c !== "Ind.").sort();
+  const confCards = h("div", { class: "grid g4" }, confs.map(c => h("div", { class: "card" }, h("h3", {}, c),
+    rows.filter(x => x.conf === c).sort((a, b) => b.conf_title - a.conf_title).slice(0, 4).map(x =>
+      h("div", { class: "mini-row" }, h("a", { class: "team-cell", href: `#/cfb/team/${x.id}` }, logo(x.t), x.t.short),
+        h("span", { class: "small" }, h("b", {}, pct(x.conf_title)), h("span", { class: "muted" }, ` · title game ${pct(x.ccg)}`)))))));
+  const tbl = table([
+    { k: "t", label: "Team", sort: x => x.t.name, asc: true, fmt: x => teamLink("cfb", x.t) },
+    { k: "conf", label: "Conf", asc: true },
+    { k: "rec", label: "Proj. record", sort: x => x.wins, fmt: x => `${fmt.n(x.wins)}-${fmt.n(x.losses)}` },
+    { k: "bowl", label: "Bowl elig.", num: true, title: "6+ wins (incl. a conference title game)", fmt: x => pct(x.bowl) },
+    { k: "ccg", label: "Title game", num: true, fmt: x => pct(x.ccg) },
+    { k: "conf_title", label: "Win conf", num: true, fmt: x => pct(x.conf_title) },
+    { k: "cfp", label: "Make CFP", num: true, fmt: x => h("b", {}, pct(x.cfp)) },
+    { k: "bye", label: "Bye", num: true, fmt: x => pct(x.bye) },
+    { k: "semi", label: "Semis", num: true, fmt: x => pct(x.semi) },
+    { k: "final", label: "Final", num: true, fmt: x => pct(x.final) },
+    { k: "title", label: "Title", num: true, fmt: x => h("b", { class: x.title > 0.05 ? "pos" : "" }, pct(x.title, 1)) },
+  ], rows, { sort: "cfp", maxH: "640px" });
+  let conf = "";
+  const confSel = h("select", { class: "in", onchange: e => { conf = e.target.value; tbl.redraw(rows.filter(x => !conf || x.conf === conf)); } },
+    h("option", { value: "" }, "All conferences"), [...confs, "Ind."].map(c => h("option", { value: c }, c)));
+  mount(
+    h("h1", {}, "College Football Playoff Odds"),
+    h("p", { class: "lede" }, `${p.sims.toLocaleString()} simulations of the rest of the season, through week ${p.asOfWeek}: every remaining game, every conference title game, a 12-team field picked by a committee proxy, and the full playoff. Uses current ratings including injury / QB adjustments.`),
+    h("div", { class: "grid", style: { gridTemplateColumns: "minmax(0,1.7fr) minmax(0,1fr)" }, id: "poGrid" }, bracket, titleCard),
+    h("h2", { style: { marginTop: "18px" } }, "Conference races"), confCards,
+    h("div", { class: "card tight", style: { marginTop: "16px" } }, h("div", { class: "card-head" }, h("h2", {}, "Every team"), confSel), tbl),
+    h("div", { class: "note" }, "How it works: each simulated season gives every team a season-long rating shock (we don't know anyone's true strength exactly), plays every game with the model's win probabilities, stages conference title games for the top two in each league, ranks teams by a résumé score (rating minus ~6 pts per loss, plus a bonus for a conference title), takes the five best conference champions plus seven at-large teams, and plays the bracket. It's a model of the committee, not the committee."));
+  if (matchMedia("(max-width: 900px)").matches) $("#poGrid").style.gridTemplateColumns = "1fr";
+};

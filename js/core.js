@@ -1,7 +1,7 @@
 /* core.js — data loading, routing, DOM + formatting helpers shared by every view. */
 const SPORTS = {
   cfb: { name: "CFB", full: "College Football", path: "football/college-football", featured: true,
-         tabs: [["ratings", "Power Ratings"], ["predictions", "Predictions"], ["disappoint", "Most Disappointing"],
+         tabs: [["ratings", "Power Ratings"], ["predictions", "Predictions"], ["playoff", "Playoff Odds"], ["disappoint", "Most Disappointing"],
                 ["recruiting", "Recruiting"], ["portal", "Transfer Portal"], ["record", "Model vs Market"], ["sim", "Game Sim"], ["teams", "Teams"], ["board", "Message Board"]] },
   nfl: { name: "NFL", full: "NFL", path: "football/nfl" },
   nba: { name: "NBA", full: "NBA", path: "basketball/nba" },
