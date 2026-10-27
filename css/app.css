@@ -271,3 +271,6 @@ table.cmp td { font-size: 14px; } table.cmp td:first-child { text-align: right; 
 .pk-btn.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--panel)); }
 .pk-btn:disabled { cursor: default; }
 .pk-foot { display: flex; align-items: center; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+.otd-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.otd-year { font-weight: 800; font-size: 20px; color: var(--accent); font-variant-numeric: tabular-nums; }
+.otd-text { margin: 0 0 8px; font-weight: 600; font-size: 15px; line-height: 1.4; }
