@@ -6,6 +6,10 @@
 set -e
 cd "$(dirname "$0")"
 git fetch -q origin
+# data/ is published ONLY by the cloud build. Anything built locally is throwaway: drop it so it can never
+# conflict with (or overwrite) the bot's data. Code changes are untouched.
+git restore --staged --worktree --source=HEAD -- data 2>/dev/null || true
+git clean -fdq -- data
 if git merge-base HEAD origin/main >/dev/null 2>&1; then
   git pull -q --rebase --autostash origin main
   # an autostash that re-applies with conflicts leaves marker-filled files behind; never report success
