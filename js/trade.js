@@ -1,14 +1,16 @@
 /* trade.js — trade simulator: build a two-team trade, check league rules, and estimate whether each front office accepts.
 
-Player value (from the build): 'now' = production converted to a market salary on the league's own pay curve
-(0-100 scale), 'fut' = the same adjusted for age vs the sport's peak, 'sur' = contract surplus over the years left.
-Each team weighs now vs future by its situation (power rank: contender / middle / rebuilder), consolidates
+Player value (from the build, one 0-100 scale in every sport, 100 = franchise player): 'now' = production
+percentile within the player's position group on a convex curve (stars are rare) times position value;
+'fut' = average value over the next 3 seasons on the sport/position aging curve; 'sur' = contract surplus
+(market value minus real salary over the years of control left). Each team weighs now vs future and how much
+it cares about cheap contracts by its situation (power rank: contender / middle / rebuilder), consolidates
 packages with a power mean (two quarters are worth less than a dollar), pays for roster spots, and protects
-its starting QB / goalie. P(accept) is a logistic on the percentage value gained. */
+its starting QB / goalie. Picks are worth more coming from bad teams. P(accept) is a logistic on the % value gained. */
 const Trade = {};
 
-const MODE_W = { contend: [0.75, 0.25], middle: [0.55, 0.45], rebuild: [0.3, 0.7] };
-const POWER_K = { nba: 1.6, nfl: 1.3, nhl: 1.4, mlb: 1.25 };
+const MODE_W = { contend: [0.75, 0.25, 0.2], middle: [0.55, 0.45, 0.35], rebuild: [0.3, 0.7, 0.5] };   // now, fut, surplus
+const POWER_K = { nba: 2.2, nfl: 1.5, nhl: 1.7, mlb: 1.7 };
 const KEY_POS = { nfl: ["QB"], nhl: ["G"] };
 const PICK_YEARS = [2027, 2028, 2029];
 
@@ -16,20 +18,27 @@ function teamMode(d, t) {
   const n = d.teams.length;
   return t.rank <= n / 3 ? "contend" : t.rank > (2 * n) / 3 ? "rebuild" : "middle";
 }
+// a pick from the worst team projects near the top of the draft; the further out, the less anyone can tell
+function pickSlot(d, a) {
+  const from = d._byId[a.from];
+  if (!from) return 1;
+  const raw = 0.7 + 0.65 * (from.rank - 1) / Math.max(1, d.teams.length - 1);
+  return 1 + (raw - 1) * Math.pow(0.6, a.year - PICK_YEARS[0]);
+}
 function assetValue(sport, d, a, recv, retained) {
   const mode = teamMode(d, recv);
-  const [wn, wf] = MODE_W[mode];
+  const [wn, wf, ws] = MODE_W[mode];
   if (a.pick) {
     const base = d.rules.pick_vals[a.round] || 1;
-    return base * { rebuild: 1.3, middle: 1.0, contend: 0.75 }[mode] * Math.pow(0.9, a.year - PICK_YEARS[0]);
+    return base * pickSlot(d, a) * { rebuild: 1.3, middle: 1.0, contend: 0.75 }[mode] * Math.pow(0.9, a.year - PICK_YEARS[0]);
   }
   const tv = a.tv || { now: 3, fut: 3, sur: 0 };
   let sur = tv.sur;
-  if (retained) sur += (a.salary * 0.5) / d.rules.max_sal * 100 * Math.min(a.yrs || 1, 4) * 0.3;
-  return wn * tv.now + wf * tv.fut + 0.5 * Math.max(-30, sur);
+  if (retained) sur += (a.salary * 0.5) / d.rules.max_sal * 100 * Math.min(a.yrs || 1, 4) * 0.25;
+  return Math.max(0, wn * tv.now + wf * tv.fut + ws * Math.max(-30, Math.min(45, sur)));
 }
 function packageValue(sport, vals) {
-  const k = POWER_K[sport] || 1.3;
+  const k = POWER_K[sport] || 1.4;
   const pos = vals.filter(v => v > 0), neg = vals.filter(v => v < 0);
   return Math.pow(pos.reduce((s, v) => s + Math.pow(v, k), 0), 1 / k) + neg.reduce((s, v) => s + v, 0);
 }
@@ -108,6 +117,7 @@ function rulesCheck(sport, d, P, st) {
       if (after > r.cap) checks.push(["warn", `${tag} payroll ${fmt.money(after)} (est.) is over the ${fmt.money(r.cap)} luxury-tax line`]);
       if (rosterAfter > 40) checks.push(["warn", `${tag} 40-man roster would hit ${rosterAfter} - must DFA someone`]);
     }
+    for (const a of st.assets[me]) if (a.fa) checks.push(["fail", `${a.name} is a free agent this offseason - nobody can trade him until he signs`]);
     for (const a of st.assets[me]) if (a.ntc) checks.push(["warn", `${a.name} has a trade restriction (recently signed / no-trade clause) - needs consent or must wait`]);
     if (sport === "nba") {
       const firsts = st.assets[me].filter(a => a.pick && a.round === "1st").map(a => a.year).sort();
@@ -149,10 +159,10 @@ Trade.view = async (sport, args) => {
           if (sel.has(p.id)) st.assets[me] = st.assets[me].filter(a => a.id !== p.id); else st.assets[me].push(p);
           drawSide(i); update(); } },
         h("input", { type: "checkbox", checked: sel.has(p.id), tabindex: -1 }),
-        h("div", { style: { minWidth: 0 } }, h("div", { class: "pname" }, p.name, p.inj ? h("span", { class: "chip bad", style: { marginLeft: "5px" } }, p.inj) : null, p.ntc ? h("span", { class: "chip warn", style: { marginLeft: "5px" } }, "NTC") : null),
+        h("div", { style: { minWidth: 0 } }, h("div", { class: "pname" }, p.name, p.inj ? h("span", { class: "chip bad", style: { marginLeft: "5px" } }, p.inj) : null, p.ntc ? h("span", { class: "chip warn", style: { marginLeft: "5px" } }, "NTC") : null, p.fa ? h("span", { class: "chip", style: { marginLeft: "5px" } }, "Free agent") : null),
           h("div", { class: "pmeta" }, [p.pos, p.age ? `age ${p.age}` : null, p.line].filter(Boolean).join(" · "))),
         h("div", { style: { textAlign: "right" } }, h("div", { class: "mono" }, fmt.n(p.tv.now, 0)),
-          h("div", { class: "pmeta" }, `${fmt.money(p.salary)}${p.salEst ? "*" : ""} · ${p.yrs ?? "?"}y`)))));
+          h("div", { class: "pmeta" }, p.fa ? "FA" : `${fmt.money(p.salary)}${p.salEst ? "*" : ""} · ${p.yrs ?? "?"}y`)))));
     drawList();
     const roundSel = h("select", { class: "in" }, Object.keys(d.rules.pick_vals).map(r => h("option", { value: r }, r)));
     const yearSel = h("select", { class: "in" }, PICK_YEARS.map(y => h("option", { value: y }, y)));
@@ -169,12 +179,12 @@ Trade.view = async (sport, args) => {
       h("div", { class: "toolbar" },
         h("input", { placeholder: "Filter roster / position…", oninput: e => { q = e.target.value.toLowerCase(); drawList(); }, style: { flex: 1 } }),
         roundSel, yearSel, h("button", { class: "btn ghost sm", onclick: () => {
-          const a = { pick: true, id: `pk-${me}-${yearSel.value}-${roundSel.value}-${Math.random()}`, year: +yearSel.value, round: roundSel.value, name: `${yearSel.value} ${roundSel.value}` };
+          const a = { pick: true, from: me, id: `pk-${me}-${yearSel.value}-${roundSel.value}-${Math.random()}`, year: +yearSel.value, round: roundSel.value, name: `${yearSel.value} ${roundSel.value}` };
           st.assets[me].push(a); drawSide(i); update(); } }, "+ Pick"),
         sport === "nhl" ? h("label", { class: "small", style: { display: "flex", gap: "5px", alignItems: "center" } },
           h("input", { type: "checkbox", checked: st.retain[me], onchange: e => { st.retain[me] = e.target.checked; update(); } }), "Retain 50%") : null),
       list,
-      h("div", { class: "pmeta", style: { marginTop: "6px" } }, "Right column: trade value (0-100) · salary · years left", d.rules.salaryEstimated ? " · * salary estimated from production (no public salary feed)" : "")));
+      h("div", { class: "pmeta", style: { marginTop: "6px" } }, "Right column: trade value (0-100) · salary · years left", " · * salary not set yet (arbitration / no public figure), estimated from production")));
   };
 
   const update = () => {
@@ -198,7 +208,7 @@ Trade.view = async (sport, args) => {
       if (ev[reluct].p >= 0.55) continue;
       const have = new Set(st.assets[giver].map(a => a.id));
       const cands = (P[giver] || []).filter(p => !have.has(p.id)).slice()
-        .concat(Object.keys(d.rules.pick_vals).flatMap(rd => PICK_YEARS.slice(0, 2).map(y => ({ pick: true, id: `pk-${giver}-${y}-${rd}`, year: y, round: rd, name: `${y} ${rd}` }))));
+        .concat(Object.keys(d.rules.pick_vals).flatMap(rd => PICK_YEARS.slice(0, 2).map(y => ({ pick: true, from: giver, id: `pk-${giver}-${y}-${rd}`, year: y, round: rd, name: `${y} ${rd}` }))));
       const scored = [];
       for (const c of cands) {
         st.assets[giver].push(c);
