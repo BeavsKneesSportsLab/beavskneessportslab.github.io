@@ -125,10 +125,10 @@ Pickem.view = async () => {
           p ? h("span", { class: "chip good", style: { marginLeft: "auto" } }, `Your pick: ${team(d, p.pick).abbr}`) : null));
     };
     const n = Object.keys(mine).length;
-    body.replaceChildren(
+    body.replaceChildren(...[
       list.length > 1 ? h("div", { class: "toolbar" }, seg(list.map(x => [x.key, x.label]), s.key, v => { slateKey = v; drawSlate(); })) : null,
       h("p", { class: "muted" }, `${SPORTS[sport].full} · ${s.label} · ${s.games.length} games · ${isML ? "pick the winner at the DraftKings moneyline" : "pick each side against the DraftKings spread"}. ${user && profile ? `${n} of ${s.games.length} picked.` : ""}`),
-      h("div", { class: "pk-grid" }, s.games.map(card)));
+      h("div", { class: "pk-grid" }, s.games.map(card))].filter(Boolean));
   }
 
   async function drawBoard() {

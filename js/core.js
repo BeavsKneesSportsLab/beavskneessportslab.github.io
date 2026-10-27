@@ -30,6 +30,13 @@ async function sportData(sport) {
   }
   return d;
 }
+/* rosters: one small file per team (data/players/{sport}/{teamId}.json) + a name index for search */
+async function teamPlayers(sport, tids) {
+  const out = {};
+  await Promise.all([...new Set(tids.filter(Boolean))].map(async t => { out[t] = await load(`players/${sport}/${t}`).catch(() => []); }));
+  return out;
+}
+const playerIndex = sport => load(`players/${sport}/index`).catch(() => []);
 const team = (d, id) => d._byId[id] || { id, name: "TBD/FCS", short: "FCS", abbr: "FCS", logo: "", color: "#666" };
 
 /* ---------- DOM ---------- */

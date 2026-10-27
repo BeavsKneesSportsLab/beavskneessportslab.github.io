@@ -1,9 +1,11 @@
 /* players.js — player pages (bio, season numbers, live game log), player compare, MLB Hot Stove. */
 const Players = {};
 
-function findPlayer(P, tid, pid) {
-  if (tid && P[tid]) { const p = P[tid].find(x => x.id === pid); if (p) return [p, tid]; }
-  for (const [t, ros] of Object.entries(P)) { const p = ros.find(x => x.id === pid); if (p) return [p, t]; }
+async function findPlayer(sport, tid, pid) {
+  // try the given team's file; fall back to the name index to learn which team he's on now
+  if (tid) { const ros = (await teamPlayers(sport, [tid]))[tid] || []; const p = ros.find(x => x.id === pid); if (p) return [p, tid]; }
+  const hit = (await playerIndex(sport)).find(r => r[0] === pid);
+  if (hit) { const ros = (await teamPlayers(sport, [hit[3]]))[hit[3]] || []; const p = ros.find(x => x.id === pid); if (p) return [p, hit[3]]; }
   return [null, null];
 }
 function playerHref(sport, tid, pid) { return `#/${sport}/player/${tid}/${pid}`; }
@@ -33,8 +35,8 @@ async function gameLog(sport, p) {
 
 Players.page = async (sport, args) => {
   const [tidArg, pid] = args.length > 1 ? args : [null, args[0]];
-  const [d, P] = await Promise.all([sportData(sport), load(`${sport}_players`)]);
-  const [p, tid] = findPlayer(P, tidArg, pid);
+  const d = await sportData(sport);
+  const [p, tid] = await findPlayer(sport, tidArg, pid);
   if (!p) return mount(h("div", { class: "card empty" }, "Player not found in the current rosters."));
   const t = team(d, tid), isPro = sport !== "cfb";
   const kv = (label, val) => val == null || val === "" ? null : h("div", { class: "kpi" }, h("span", {}, label), h("b", {}, val));
@@ -67,13 +69,14 @@ Players.page = async (sport, args) => {
         isPro && p.tv ? h("div", { class: "card" }, h("h2", {}, "Trade profile"),
           h("div", { class: "kpis", style: { marginTop: 0 } }, kv("Value now", fmt.n(p.tv.now, 0)), kv("Future value", fmt.n(p.tv.fut, 0)), kv("Contract surplus", fmt.sgn(p.tv.sur, 0)), kv("Market value", fmt.money(p.mv))),
           h("a", { class: "btn sm", href: `#/${sport}/trade/${tid}/${p.id}`, style: { marginTop: "10px", display: "inline-block" } }, "Shop him in the trade simulator")) : null,
-        h("div", { class: "card" }, h("h2", {}, "Compare"), comparePicker(sport, P, d, tid, p))),
+        h("div", { class: "card" }, h("h2", {}, "Compare"), comparePicker(sport, d, tid, p))),
       logBox));
   if (matchMedia("(max-width: 900px)").matches) $("#plGrid").style.gridTemplateColumns = "1fr";
 };
 
-function comparePicker(sport, P, d, tid, p) {
-  const all = Object.entries(P).flatMap(([t, ros]) => ros.filter(x => x.sim && Object.keys(x.sim).length).map(x => ({ t, x })));
+function comparePicker(sport, d, tid, p) {
+  let all = [];
+  playerIndex(sport).then(ix => { all = ix.map(([id, name, pos, t]) => ({ t, x: { id, name, pos } })); });
   const list = h("div", { class: "pick-list" });
   const input = h("input", { class: "in", placeholder: "Search a player to compare…", style: { width: "100%" }, oninput: e => {
     const q = e.target.value.toLowerCase();
@@ -85,8 +88,8 @@ function comparePicker(sport, P, d, tid, p) {
 
 Players.compare = async (sport, args) => {
   const [t1, p1, t2, p2] = args;
-  const [d, P] = await Promise.all([sportData(sport), load(`${sport}_players`)]);
-  const [a, ta] = findPlayer(P, t1, p1), [b, tb] = findPlayer(P, t2, p2);
+  const d = await sportData(sport);
+  const [[a, ta], [b, tb]] = await Promise.all([findPlayer(sport, t1, p1), findPlayer(sport, t2, p2)]);
   if (!a || !b) return mount(h("div", { class: "card empty" }, "One of those players isn't on a current roster."));
   const keys = [...new Set([...Object.keys(a.sim || {}), ...Object.keys(b.sim || {})])].filter(k => STAT_LABELS[k] && ((a.sim || {})[k] || (b.sim || {})[k]));
   const row = (label, va, vb, better = "high", dp = 1) => {

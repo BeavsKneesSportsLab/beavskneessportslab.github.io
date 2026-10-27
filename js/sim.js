@@ -151,7 +151,7 @@ function histogram(margins, sport, left, right) {
 
 Sim.view = async (sport, args) => {
   const d = await sportData(sport);
-  const players = await load(`${sport}_players`).catch(() => ({}));
+
   const sorted = d.teams.slice().sort((a, b) => (a.rank || 999) - (b.rank || 999));
   let aId = args[0] || sorted[0].id, bId = args[1] || sorted[1].id;
   let venue = args[2] === "n" ? "neutral" : bId, N = 20000, line = "", total = "";
@@ -178,7 +178,8 @@ Sim.view = async (sport, args) => {
     const A = team(d, aId), B = team(d, bId);
     if (aId === bId) { out.replaceChildren(h("div", { class: "card empty" }, "Pick two different teams.")); return; }
     out.replaceChildren(h("div", { class: "card empty" }, `Running ${N.toLocaleString()} simulations…`));
-    setTimeout(() => {
+    setTimeout(async () => {
+      const players = await teamPlayers(sport, [aId, bId]);
       const t0 = performance.now();
       const homeId = venue === "neutral" ? null : venue;
       const res = Sim.run(sport, d, A, B, homeId, N, players);

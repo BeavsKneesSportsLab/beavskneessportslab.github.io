@@ -228,8 +228,7 @@ Views.team = async (sport, id) => {
   const d = await sportData(sport);
   const t = team(d, id);
   const isCfb = sport === "cfb";
-  const players = await load(`${sport}_players`).catch(() => ({}));
-  const built = players[id] || [];
+  const built = (await teamPlayers(sport, [id]))[id] || [];
   const builtById = Object.fromEntries(built.map(p => [p.id, p]));
   const sched = d.schedule.filter(g => g.home === id || g.away === id);
 

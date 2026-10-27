@@ -21,6 +21,13 @@ async function route() {
   drawNav(sport, tab);
   const meta = await load("meta").catch(() => ({}));
   const m = sport && meta[sport];
+  // stale-data banner: the cloud build runs daily; >36h old or a failed build means something broke
+  const bad = Object.entries(meta).filter(([k, v]) => (!sport || k === sport) && (v.status !== "ok" || Date.now() - new Date(v.built) > 36 * 3600e3));
+  const banner = $("#staleBanner");
+  if (banner) {
+    banner.hidden = !bad.length;
+    banner.textContent = bad.length ? `Heads up: ${bad.map(([k]) => SPORTS[k]?.name || k).join(", ")} data hasn't refreshed since ${fmt.ago(bad[0][1].built)}. Numbers may be out of date.` : "";
+  }
   $("#foot").textContent = (m ? `${SPORTS[sport].full} data built ${fmt.ago(m.built)}${m.status !== "ok" ? ` - LAST BUILD ${m.status.toUpperCase()}, showing older data` : ""}. ` : "") +
     "Beavs Knees Sports Lab - independent fan project, not affiliated with Oregon State University or any league. Sources: ESPN, NHL & MLB stats APIs, CollegeFootballData, Trade Rumors network. Ratings are our own models. For fun and analysis, not betting advice.";
   $("#app").replaceChildren(h("div", { class: "loading" }, "Loading…"));

@@ -124,10 +124,12 @@ function verdictLabel(p) {
 
 Trade.view = async (sport, args) => {
   const d = await sportData(sport);
-  const P = await load(`${sport}_players`);
+  const P = {};                                            // per-team rosters, fetched as teams are picked
+  const ensure = async (...tids) => Object.assign(P, await teamPlayers(sport, tids.filter(t => t && !P[t])));
   const byRank = d.teams.slice().sort((a, b) => a.rank - b.rank);
   const aId = args[0] || byRank[byRank.length - 1].id;
   const bId = args[1] && args[1] !== aId && d._byId[args[1]] ? args[1] : (byRank[0].id === aId ? byRank[1].id : byRank[0].id);
+  await ensure(aId, bId);
   const st = { teams: [aId, bId], assets: { [aId]: [], [bId]: [] }, retain: { [aId]: false, [bId]: false } };
   if (args[1] && !d._byId[args[1]]) {                      // #/sport/trade/team/playerId
     const pl = (P[aId] || []).find(p => p.id === args[1]);
@@ -156,7 +158,7 @@ Trade.view = async (sport, args) => {
     const yearSel = h("select", { class: "in" }, PICK_YEARS.map(y => h("option", { value: y }, y)));
     cols[i].replaceChildren(h("div", { class: "card" },
       h("div", { class: "card-head" }, h("div", { class: "team-cell", style: { gap: "10px" } }, logo(T, "md"),
-          teamSelect(d, me, v => { if (v === st.teams[1 - i]) return; st.assets[v] = []; st.retain[v] = false; delete st.assets[me]; st.teams[i] = v; drawSide(i); update(); })),
+          teamSelect(d, me, async v => { if (v === st.teams[1 - i]) return; await ensure(v); st.assets[v] = []; st.retain[v] = false; delete st.assets[me]; st.teams[i] = v; drawSide(i); update(); })),
         h("span", { class: "chip" }, `#${T.rank} · ${teamMode(d, T)}`)),
       h("div", { class: "small muted" }, `Payroll ${fmt.money(T.payroll)}${d.rules.salaryEstimated ? " (est.)" : ""} · ${fmt.rec(T)}`),
       h("h3", { style: { marginTop: "12px" } }, `${T.abbr} sends`),
