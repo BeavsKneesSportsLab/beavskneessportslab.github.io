@@ -44,14 +44,16 @@ function footballScore(x) {
   return s;
 }
 
+const UNAVAILABLE = new Set(["out", "inactive", "doubtful"]);
 function pickPlayers(sport, ros) {
-  const has = ros.filter(p => p.sim && Object.keys(p.sim).length);
+  const has = ros.filter(p => p.sim && Object.keys(p.sim).length && !UNAVAILABLE.has(p.avail));
   const by = (k, n, f = () => true) => has.filter(f).sort((a, b) => (b.sim[k] || 0) - (a.sim[k] || 0)).slice(0, n).filter(p => p.sim[k] > 0);
   if (sport === "nba") return by("min", 10);
   if (sport === "nhl") return has.filter(p => p.pos !== "G").sort((a, b) => (b.sim.g + b.sim.a) - (a.sim.g + a.sim.a)).slice(0, 12);
   if (sport === "mlb") return by("pa", 9);
   const seen = new Set(), out = [];
-  for (const p of [...by("passYds", 1), ...by("rushYds", 2), ...by("recYds", 4), ...has.slice().sort((a, b) => ((b.sim.tkl || 0) + 4 * (b.sim.sacks || 0)) - ((a.sim.tkl || 0) + 4 * (a.sim.sacks || 0))).slice(0, 3)])
+  const qb = has.filter(p => p.qb1).concat(by("passYds", 1)).slice(0, 1);    // current starter, not the season leader
+  for (const p of [...qb, ...by("rushYds", 2, p => !p.qb1 || !qb.includes(p)), ...by("recYds", 4), ...has.slice().sort((a, b) => ((b.sim.tkl || 0) + 4 * (b.sim.sacks || 0)) - ((a.sim.tkl || 0) + 4 * (a.sim.sacks || 0))).slice(0, 3)])
     if (!seen.has(p.id)) { seen.add(p.id); out.push(p); }
   return out;
 }
@@ -74,7 +76,8 @@ Sim.run = (sport, d, A, B, homeId, N, players) => {
   const sigma = d.sigma, hfa = d.hfa, L = d.leagueAvg;
   const sc = d._rates ||= scoringRates(d, sport);
   const [oA, dA] = sc[A.id] || [0, 0], [oB, dB] = sc[B.id] || [0, 0];
-  const m = (A.rating || 0) - (B.rating || 0) + (homeId === A.id ? hfa : homeId === B.id ? -hfa : 0);
+  // injury / QB-change adjustments (points) ride on top of the power rating
+  const m = (A.rating || 0) + (A.injAdj || 0) - (B.rating || 0) - (B.injAdj || 0) + (homeId === A.id ? hfa : homeId === B.id ? -hfa : 0);
   const T = Math.max(L * 1.2, 2 * L + oA + dB + oB + dA);
   const eA = Math.max(0.2, T / 2 + m / 2), eB = Math.max(0.2, T / 2 - m / 2);
   const sA = new Int16Array(N), sB = new Int16Array(N);
@@ -206,6 +209,8 @@ Sim.view = async (sport, args) => {
     out.replaceChildren(
       h("div", { class: "card" },
         h("div", { class: "result-hero" }, who(A, pA), h("div", { class: "vs" }, "vs"), who(B, pB)),
+        [A, B].some(t => t.injAdj) ? h("div", { class: "inj-note" }, "Injuries / QB changes applied: ",
+          [A, B].filter(t => t.injAdj).map(t => `${t.abbr} ${fmt.sgn(t.injAdj)} (${t.injNotes.join("; ")})`).join(" · ")) : null,
         h("p", { class: "muted small", style: { textAlign: "center", margin: "10px 0 0" } }, `${res.N.toLocaleString()} sims ${where} · ${ms.toFixed(0)} ms · expected ${A.abbr} ${fmt.n(res.eA, dec)} - ${B.abbr} ${fmt.n(res.eB, dec)}`),
         h("div", { class: "kpis" },
           h("div", { class: "kpi" }, h("span", {}, "Most likely winner"), h("b", {}, pA >= 0.5 ? A.short || A.abbr : B.short || B.abbr)),

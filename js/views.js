@@ -16,6 +16,8 @@ Views.ratings = async (sport) => {
     { k: "w", label: "Record", sort: t => isCfb ? parseInt(t.record) : t.w / Math.max(1, t.gp), fmt: t => isCfb ? t.record || "–" : fmt.rec(t) },
     { k: "rating", label: `Rating (${d.unit})`, num: true, title: "Neutral-site margin vs an average team",
       fmt: t => h("span", { class: "mono" }, fmt.sgn(t.rating, sport === "nhl" || sport === "mlb" ? 2 : 1)) },
+    { k: "injAdj", label: "Inj adj", num: true, asc: true, title: "Points added/subtracted in predictions for injuries and QB changes (hover for detail)",
+      fmt: t => t.injAdj ? h("span", { class: t.injAdj < 0 ? "neg" : "pos", title: (t.injNotes || []).join("\n"), style: { cursor: "help" } }, fmt.sgn(t.injAdj)) : h("span", { class: "muted" }, "–") },
     { k: "bar", label: "", nosort: true, fmt: t => h("div", { class: "diverge" }, h("i", { style: {
         left: t.rating >= 0 ? "50%" : `${50 - 50 * Math.abs(t.rating) / maxR}%`,
         width: `${50 * Math.abs(t.rating) / maxR}%`, background: t.rating >= 0 ? "var(--good)" : "var(--bad)" } })) },
@@ -61,7 +63,12 @@ function gameCard(sport, d, g) {
     h("div", { class: "game-foot" }, h("span", {}, "Model: ", h("b", {}, spreadText(sport, d, g))),
       h("span", {}, done ? `Final ${g.as}-${g.hs}` : `Fair ML ${american(pA)} / ${american(pH)}`),
       h("a", { class: "link", href: `#/${sport}/sim/${g.away}/${g.home}${g.neutral ? "/n" : ""}` }, "Simulate →")),
+    injLine(A, H),
     marketBlock(sport, d, g, A, H));
+}
+function injLine(...ts) {
+  const hit = ts.filter(t => t.injAdj);
+  return hit.length ? h("div", { class: "inj-note" }, "⚕ ", hit.map(t => `${t.abbr} ${fmt.sgn(t.injAdj)}: ${t.injNotes.join("; ")}`).join(" · ")) : null;
 }
 
 /* What the book is actually offering next to what the model says. Model numbers are fair values,
@@ -212,7 +219,8 @@ Views.team = async (sport, id) => {
     const rows = ros.map(p => ({ ...builtById[p.id], ...Object.fromEntries(Object.entries(p).filter(([, v]) => v != null)) }));
     const cols = [
       { k: "jersey", label: "#", num: true, asc: true, sort: p => +p.jersey || 999 },
-      { k: "name", label: "Player", asc: true, fmt: p => h("div", { class: "team-cell" }, p.img ? h("img", { class: "headshot", src: p.img, loading: "lazy", alt: "" }) : h("span", { class: "headshot" }), h("span", {}, p.name, p.inj ? h("span", { class: "chip bad", style: { marginLeft: "6px" } }, p.inj) : null)) },
+      { k: "name", label: "Player", asc: true, fmt: p => h("div", { class: "team-cell" }, p.img ? h("img", { class: "headshot", src: p.img, loading: "lazy", alt: "" }) : h("span", { class: "headshot" }), h("span", {}, p.name, p.qb1 ? h("span", { class: "chip good", style: { marginLeft: "6px" } }, "QB1") : null,
+        p.inj ? h(p.injSrc ? "a" : "span", { class: "chip bad", style: { marginLeft: "6px" }, title: p.injNote || p.inj, href: p.injSrc || null, target: p.injSrc ? "_blank" : null }, p.inj) : null)) },
       { k: "pos", label: "Pos", asc: true, sort: p => { const i = posOrder.indexOf(p.pos); return i < 0 ? 99 : i; } },
       isCfb ? { k: "cls", label: "Class" } : { k: "age", label: "Age", num: true },
       { k: "ht", label: "Ht" }, { k: "wt", label: "Wt" },
@@ -262,6 +270,7 @@ Views.team = async (sport, id) => {
       h("div", { class: "stats" }, stat(isCfb ? t.record || "–" : fmt.rec(t), "Record"), stat(`#${t.rank ?? "–"}`, "Power rank"),
         stat(fmt.sgn(t.rating, sport === "nhl" || sport === "mlb" ? 2 : 1), "Rating"),
         isCfb ? stat(fmt.n(t.projW), "Proj. wins") : stat(fmt.money(t.payroll), "Payroll"))),
+    t.injAdj ? h("div", { class: "note warn" }, `Injury / QB adjustment in predictions: ${fmt.sgn(t.injAdj)} pts - ${t.injNotes.join("; ")}`) : null,
     h("div", { class: "grid", style: { gridTemplateColumns: "minmax(0,1.6fr) minmax(0,1fr)" }, id: "teamGrid" },
       h("div", { class: "grid" }, h("div", { class: "card" }, rosterBox)),
       h("div", { class: "grid", style: { alignContent: "start" } }, h("div", { class: "card tight" }, h("h2", {}, "Schedule"), schedTbl), ...side)));
