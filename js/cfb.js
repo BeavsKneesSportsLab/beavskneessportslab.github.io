@@ -281,7 +281,7 @@ CFB.heisman = async () => {
     h("div", { class: "card tight", style: { marginTop: "16px" } }, h("h2", {}, "The field"),
       table([
         { k: "rank", label: "#", num: true, asc: true, sort: c => -c.odds, fmt: (c, i) => i + 1 },
-        { k: "name", label: "Player", asc: true, fmt: c => h("div", { class: "team-cell" }, c.img ? h("img", { class: "headshot", src: c.img, alt: "", loading: "lazy" }) : h("span", { class: "headshot" }), h("div", {}, h("b", {}, c.name), h("div", { class: "muted small" }, c.pos))) },
+        { k: "name", label: "Player", asc: true, fmt: c => h("div", { class: "team-cell" }, c.img ? h("img", { class: "headshot", src: c.img, alt: "", loading: "lazy" }) : h("span", { class: "headshot" }), h("div", {}, h("a", { class: "plink", href: `#/cfb/player/${c.team}/${c.id}` }, h("b", {}, c.name)), h("div", { class: "muted small" }, c.pos))) },
         { k: "t", label: "Team", sort: c => c.t.rank, asc: true, fmt: c => h("span", { class: "team-cell" }, logo(c.t), `${c.t.short} (#${c.t.rank})`) },
         { k: "line", label: "Season", nosort: true, cls: "wrap", fmt: c => h("span", { class: "small" }, c.line) },
         { k: "odds", label: "Win share", num: true, fmt: c => h("div", { style: { display: "flex", gap: "8px", alignItems: "center", justifyContent: "flex-end" } },

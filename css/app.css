@@ -252,3 +252,9 @@ table.t td.wrap { white-space: normal; min-width: 220px; max-width: 360px; }
 .heis.first { border-color: var(--accent); }
 .heis-odds { font-size: 34px; font-weight: 800; margin: 8px 0 2px; font-variant-numeric: tabular-nums; }
 .headshot.lg { width: 56px; height: 56px; }
+.headshot.xl { width: 84px; height: 84px; border: 3px solid rgba(255,255,255,.6); }
+a.plink:hover { color: var(--accent); text-decoration: underline; }
+.pick-list { margin-top: 6px; }
+.cmp-heads { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; margin-bottom: 12px; }
+.cmp-head { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+table.cmp td { font-size: 14px; } table.cmp td:first-child { text-align: right; width: 40%; } table.cmp td:last-child { width: 40%; }

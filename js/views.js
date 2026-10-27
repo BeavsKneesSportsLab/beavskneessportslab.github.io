@@ -188,7 +188,7 @@ Views.rumors = async (sport) => {
   const hot = h("div", { class: "card" }, h("h2", {}, "🔥 Heat index"), h("p", { class: "muted small" }, "Most-mentioned players in the last 21 days (trade mentions count double)."),
     r.hot.length ? r.hot.slice(0, 15).map(p => {
       const t = team(d, p.team);
-      return h("div", { class: "heat" }, logo(t), h("div", {}, h("div", { class: "pname" }, p.name), h("div", { class: "pmeta" }, t.name)),
+      return h("div", { class: "heat" }, logo(t), h("div", {}, h("a", { class: "pname plink", href: `#/${sport}/player/${p.team}/${p.id}` }, p.name), h("div", { class: "pmeta" }, t.name)),
         h("span", { class: "flames" }, `${p.n}${p.trade ? ` · ${p.trade}T` : ""}`),
         h("a", { class: "btn sm ghost", href: `#/${sport}/trade/${p.team}/${p.id}` }, "Trade sim"));
     }) : h("div", { class: "empty" }, "No player mentions yet."));
@@ -239,7 +239,7 @@ Views.team = async (sport, id) => {
     const rows = ros.map(p => ({ ...builtById[p.id], ...Object.fromEntries(Object.entries(p).filter(([, v]) => v != null)) }));
     const cols = [
       { k: "jersey", label: "#", num: true, asc: true, sort: p => +p.jersey || 999 },
-      { k: "name", label: "Player", asc: true, fmt: p => h("div", { class: "team-cell" }, p.img ? h("img", { class: "headshot", src: p.img, loading: "lazy", alt: "" }) : h("span", { class: "headshot" }), h("span", {}, p.name, p.qb1 ? h("span", { class: "chip good", style: { marginLeft: "6px" } }, "QB1") : null,
+      { k: "name", label: "Player", asc: true, fmt: p => h("div", { class: "team-cell" }, p.img ? h("img", { class: "headshot", src: p.img, loading: "lazy", alt: "" }) : h("span", { class: "headshot" }), h("span", {}, h("a", { href: `#/${sport}/player/${id}/${p.id}`, class: "plink" }, p.name), p.qb1 ? h("span", { class: "chip good", style: { marginLeft: "6px" } }, "QB1") : null,
         p.inj ? h(p.injSrc ? "a" : "span", { class: "chip bad", style: { marginLeft: "6px" }, title: p.injNote || p.inj, href: p.injSrc || null, target: p.injSrc ? "_blank" : null }, p.inj) : null)) },
       { k: "pos", label: "Pos", asc: true, sort: p => { const i = posOrder.indexOf(p.pos); return i < 0 ? 99 : i; } },
       isCfb ? { k: "cls", label: "Class" } : { k: "age", label: "Age", num: true },
@@ -415,6 +415,21 @@ Views.projections = async (sport) => {
     h("p", { class: "lede" }, `${p.sims.toLocaleString()} simulations of the remaining ${p.remaining} games and the full playoffs, off our power ratings (injury adjustments on the next week of games). ` +
       { nfl: "Format: 4 division winners + 3 wild cards per conference, #1 seed bye, reseeding.", nba: "Format: top 6 + play-in per conference, best-of-7 series.", nhl: "Format: top 3 per division + 2 wild cards per conference, division bracket, best-of-7." }[sport]),
     cards,
+    sport === "nfl" ? draftCard(d, rows) : null,
     h("div", { class: "card tight", style: { marginTop: "16px" } }, h("h2", {}, "Every team"), tbl),
     h("div", { class: "note" }, "Each simulated season gives every team a season-long rating shock (true strength is uncertain), plays every game off the model's win probability, and runs the real playoff format. Tiebreakers are simplified to record, then a coin flip weighted by strength."));
 };
+
+function draftCard(d, rows) {
+  const r = rows.filter(x => x.avgPick != null).sort((a, b) => a.avgPick - b.avgPick).slice(0, 16);
+  return h("div", { class: "card tight", style: { marginTop: "16px" } },
+    h("div", { class: "card-head" }, h("h2", {}, "Projected 2027 draft order"), h("span", { class: "muted small" }, "From the season sims · own picks only (trades not tracked)")),
+    table([
+      { k: "avgPick", label: "Proj. pick", num: true, asc: true, fmt: (x, i) => h("b", {}, i + 1) },
+      { k: "t", label: "Team", nosort: true, fmt: x => teamLink("nfl", x.t) },
+      { k: "rec", label: "Proj. record", nosort: true, fmt: x => `${fmt.n(x.w, 1)}-${fmt.n(x.l, 1)}` },
+      { k: "ap", label: "Avg pick", num: true, nosort: true, fmt: x => fmt.n(x.avgPick, 1) },
+      { k: "pick1", label: "#1 pick", num: true, nosort: true, fmt: x => fmt.pct(x.pick1) },
+      { k: "top5", label: "Top 5", num: true, nosort: true, fmt: x => fmt.pct(x.top5) },
+    ], r, { sort: "avgPick", asc: true }));
+}

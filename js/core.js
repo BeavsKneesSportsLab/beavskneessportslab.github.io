@@ -10,7 +10,8 @@ const SPORTS = {
 };
 const PRO_TABS = [["ratings", "Power Ratings"], ["predictions", "Predictions"], ["projections", "Season Odds"], ["record", "Model vs Market"], ["standings", "Standings"],
                   ["rumors", "Trade Rumors"], ["trade", "Trade Simulator"], ["sim", "Game Sim"], ["teams", "Teams"], ["board", "Message Board"]];
-for (const k of ["nfl", "nba", "mlb", "nhl"]) SPORTS[k].tabs = PRO_TABS.filter(([t]) => k !== "mlb" || t !== "projections");
+for (const k of ["nfl", "nba", "mlb", "nhl"]) SPORTS[k].tabs = k === "mlb"
+  ? PRO_TABS.map(([t, l]) => t === "projections" ? ["hotstove", "Hot Stove"] : [t, l]) : PRO_TABS;
 
 const _cache = {};
 function load(name) {
