@@ -34,6 +34,41 @@ async function liveStories(fallback) {
   } catch { return fallback; }
 }
 
+/* home.json picks the featured games once per build. If the day's build didn't run, its list is
+   yesterday's - so re-pick today's games from each sport's predictions (several days deep), with the
+   same scoring as build/home.py featured_games. ptDay comes from pickem.js (called after every script loads). */
+const NATIONAL = new Set(["ESPN", "ABC", "FOX", "Fox", "CBS", "NBC", "TNT", "Prime Video", "FS1", "ESPN2", "Peacock", "TBS", "NFL Net", "truTV", "ESPNU", "CBSSN", "NBA TV"]);
+const SPORT_W = { cfb: 1.15, nfl: 1.1, nba: 1.0, nhl: 0.95, mlb: 1.05 };
+async function freshGames(home) {
+  const today = ptDay(Date.now());
+  if (home.date === today) return home.games;
+  const t0 = new Date(today + "T12:00:00Z");
+  const pool = [];
+  await Promise.all(HOME_SPORTS.map(async sp => {
+    const d = await sportData(sp).catch(() => null);
+    if (!d) return;
+    const n = Math.max(2, d.teams.length);
+    for (const g of d.predictions) {
+      const H = d._byId[g.home], A = d._byId[g.away];
+      if (g.state === "post" || !H || !A) continue;
+      const day = Math.round((new Date(ptDay(g.date) + "T12:00:00Z") - t0) / 864e5);
+      if (day < 0 || day > 1) continue;
+      const strength = [H, A].reduce((s, t) => s + 1 - ((t.rank || n) - 1) / (n - 1), 0) / 2;
+      const close = 1 - 2 * Math.abs((g.pHome ?? 0.5) - 0.5);
+      const tv = (g.tv || "").split(",").some(x => NATIONAL.has(x.trim())) ? 0.15 : 0;
+      const score = (0.6 * strength + 0.3 * close + tv + (g.stype === 3 ? 0.35 : 0)) * SPORT_W[sp] - 0.25 * day;
+      pool.push({ sport: sp, id: g.id, date: g.date, day, score, home: H, away: A, margin: g.margin, pHome: g.pHome,
+                  mkt: g.mkt, tv: g.tv, neutral: g.neutral, unit: d.unit,
+                  injNotes: [H, A].filter(t => t.injAdj).flatMap(t => t.injNotes || []) });
+    }
+  }));
+  pool.sort((a, b) => b.score - a.score);
+  const top = cands => { const per = {}; return cands.filter(x => (per[x.sport] = (per[x.sport] || 0) + 1) <= 3).slice(0, 8); };
+  const todayOnly = top(pool.filter(x => x.day === 0));
+  const pick = todayOnly.length >= 6 ? todayOnly : top(pool);
+  return pick.length ? pick : home.games.filter(g => ptDay(g.date) >= today);
+}
+
 function featuredCard(g, live, big) {
   const L = live[g.id] || {};
   const state = L.state || "pre";
@@ -88,6 +123,7 @@ function giscusInto(box, term) {
 Views.home = async () => {
   clearInterval(_homeTimer);
   const home = await load("home").catch(() => ({ games: [], stories: [], topic: null }));
+  home.games = await freshGames(home);
   const [cfb, ledger, poll] = await Promise.all([sportData("cfb").catch(() => null), load("ledger_cfb").catch(() => null), load("cfb_poll").catch(() => null)]);
   const gamesBox = h("div", { class: "fg-grid" });
   const drawGames = live => gamesBox.replaceChildren(...(home.games.length
