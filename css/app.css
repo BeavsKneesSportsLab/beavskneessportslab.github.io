@@ -299,3 +299,26 @@ table.cmp td { font-size: 14px; } table.cmp td:first-child { text-align: right; 
 .home-lists { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important; }
 .brand-logo { border-radius: 50%; }
 .home-logo { width: 84px !important; height: 84px !important; border-radius: 16px; object-fit: cover; border: 2px solid var(--accent); box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+
+/* Oregon State page */
+.osu-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 14px; }
+.osu-chips button.chip { border: 0; cursor: pointer; font-size: 12.5px; padding: 5px 11px; }
+.osu-chips button.chip.on { background: var(--accent); color: #111; }
+.osu-chips button.chip.on .muted { color: #111; }
+.osu-toggle { margin-left: auto; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+.osu-ev { display: grid; grid-template-columns: 78px auto minmax(0, 1fr) minmax(0, max-content); gap: 8px; align-items: center; padding: 7px 0; border-top: 1px solid var(--line); color: var(--text); text-decoration: none; }
+.osu-ev:first-of-type { border-top: 0; }
+a.osu-ev:hover .osu-opp span { text-decoration: underline; }
+.osu-opp { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.osu-opp span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.osu-opp .logo { width: 20px; height: 20px; object-fit: contain; flex: none; }
+.chip.osu-off { background: var(--accent); color: #111; }
+.osu-ph { display: grid; place-items: center; font-size: 20px; }
+.home-side { display: grid; gap: 16px; align-content: start; }
+.osu-home-up { margin-top: 10px; }
+@media (max-width: 600px) { .osu-ev { grid-template-columns: 62px minmax(0, 1fr) auto; } .osu-ev .chip { display: none; } .osu-toggle { margin-left: 0; } }
+.osu-home .kicker { color: var(--accent); font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 2px; }
+.osu-ev > :last-child { text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
+.card .story-lead img { max-height: 340px; }
+.osu-sp { display: none; }
+@media (max-width: 600px) { .osu-sp { display: block; color: var(--accent); font-weight: 600; } }
