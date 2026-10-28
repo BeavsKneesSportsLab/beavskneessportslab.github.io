@@ -69,7 +69,7 @@ async function freshGames(home) {
   return pick.length ? pick : home.games.filter(g => ptDay(g.date) >= today);
 }
 
-function featuredCard(g, live, big) {
+function featuredCard(g, live, big, why) {
   const L = live[g.id] || {};
   const state = L.state || "pre";
   const H = g.home, A = g.away, pH = g.pHome ?? 0.5;
@@ -93,7 +93,8 @@ function featuredCard(g, live, big) {
       g.mkt ? h("span", {}, "DK ", h("b", {}, goals || g.mkt.spread == null ? `${fmtML(g.mkt.mlA)}/${fmtML(g.mkt.mlH)}` : `${H.abbr} ${fmtSpread(g.mkt.spread)}`)) : null,
       h("a", { class: "link", href: `#/${g.sport}/sim/${A.id}/${H.id}${g.neutral ? "/n" : ""}` }, "Sim →")),
     g.injNotes?.length ? h("div", { class: "inj-note", title: g.injNotes.join("\n") }, "⚕ ",
-      g.injNotes.map(n => n.replace(/:.*- ([-+]\d+(?:\.\d)?) pts$/, " ($1)")).slice(0, 2).join(" · ")) : null);
+      g.injNotes.map(n => n.replace(/:.*- ([-+]\d+(?:\.\d)?) pts$/, " ($1)")).slice(0, 2).join(" · ")) : null,
+    why || null);
 }
 
 function storyList(stories) {
@@ -126,10 +127,16 @@ Views.home = async () => {
   home.games = await freshGames(home);
   const [cfb, ledger, poll] = await Promise.all([sportData("cfb").catch(() => null), load("ledger_cfb").catch(() => null), load("cfb_poll").catch(() => null)]);
   const gamesBox = h("div", { class: "fg-grid" });
-  const drawGames = live => gamesBox.replaceChildren(...(home.games.length
-    ? home.games.map((g, i) => featuredCard(g, live, i === 0))
-    : [h("div", { class: "empty" }, "No games on the slate today.")]));
+  // the "why" write-ups need each sport's full ratings; cards redraw every minute, so remember which are open
+  const sd = {}, openWhy = new Set();
+  let lastLive = {};
+  const why = g => { const d = sd[g.sport], p = d?.predictions.find(x => x.id === g.id); return p ? whyBox(g.sport, d, p, openWhy) : null; };
+  const drawGames = live => { lastLive = live; gamesBox.replaceChildren(...(home.games.length
+    ? home.games.map((g, i) => featuredCard(g, live, i === 0, why(g)))
+    : [h("div", { class: "empty" }, "No games on the slate today.")])); };
   drawGames({});
+  Promise.all([...new Set(home.games.map(g => g.sport))].map(sp => sportData(sp).then(d => { sd[sp] = d; }).catch(() => {})))
+    .then(() => drawGames(lastLive));
   liveScores(home.games).then(drawGames);
   _homeTimer = setInterval(() => { if (location.hash.replace(/^#\/?/, "") === "") liveScores(home.games).then(drawGames); else clearInterval(_homeTimer); }, 60000);
 

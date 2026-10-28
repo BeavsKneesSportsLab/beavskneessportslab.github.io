@@ -64,7 +64,92 @@ function gameCard(sport, d, g) {
       h("span", {}, done ? `Final ${g.as}-${g.hs}` : `Fair ML ${american(pA)} / ${american(pH)}`),
       h("a", { class: "link", href: `#/${sport}/sim/${g.away}/${g.home}${g.neutral ? "/n" : ""}` }, "Simulate →")),
     injLine(A, H),
-    marketBlock(sport, d, g, A, H));
+    marketBlock(sport, d, g, A, H),
+    whyBox(sport, d, g));
+}
+/* "Why" write-up: the model's own ingredients in plain words. A prediction is
+   (rating + injury adj) home − (rating + injury adj) away + home edge, so the pieces listed add up to
+   the line shown. NHL lists injuries but applies them 0x; MLB has none (and no starting pitchers). */
+const INJ_APPLIED = new Set(["nfl", "nba", "cfb"]);
+function whyParts(sport, d, g) {
+  const H = team(d, g.home), A = team(d, g.away);
+  if (H.rating == null || A.rating == null || g.margin == null || g.pHome == null) return null;
+  const goals = sport === "nhl" || sport === "mlb", dp = goals ? 2 : 1, u = d.unit || "pts";
+  const homeFav = g.margin >= 0, F = homeFav ? H : A, U = homeFav ? A : H;
+  const pF = homeFav ? g.pHome : 1 - g.pHome;
+  const nm = t => t.short || t.name, poss = t => nm(t) + (nm(t).endsWith("s") ? "'" : "'s");
+  const flip = Math.abs(pF - 0.5) < 0.04;
+  const out = [];
+
+  // 1. how the number is built, signed toward the favorite
+  const gap = F.rating - U.rating;
+  const bits = [`ratings gap ${fmt.sgn(gap, dp)} (#${F.rank} vs #${U.rank})`];
+  if (!g.neutral && d.hfa) bits.push(`${nm(H)} home ${sport === "nhl" ? "ice" : sport === "nba" ? "court" : "field"} ${fmt.sgn(homeFav ? d.hfa : -d.hfa, dp)}`);
+  if (INJ_APPLIED.has(sport)) {
+    const inj = (F.injAdj || 0) - (U.injAdj || 0);
+    const who = [F, U].filter(t => Math.abs(t.injAdj || 0) >= 0.3 && t.injNotes?.length)
+      .map(t => {
+        const n = t.injNotes[0].split(":")[0].replace(/\s*\([^)]*\)|\s+out\b|\s[-+]?\d+(\.\d+)?$/gi, "").trim();
+        return /^QB change/i.test(n) ? `${nm(t)} ${n.replace(/^QB change/i, "QB change")}` : `${nm(t)} without ${n}`;
+      });
+    if (Math.abs(inj) >= 0.3) bits.push(`injuries ${fmt.sgn(inj, dp)}${who.length ? ` (${who.join("; ")})` : ""}`);
+  }
+  out.push(flip ? `Coin flip: ${nm(F)} ${fmt.pct(pF)} to win. The pieces: ${bits.join(", ")}.`
+    : `Model has ${nm(F)} ${goals ? `winning ${fmt.pct(pF)}` : `by ${fmt.n(Math.abs(g.margin), 1)} (${fmt.pct(pF)} to win)`}. How it gets there: ${bits.join(", ")}.`);
+  if (gap < 0 && !flip) {
+    const why = [!g.neutral && homeFav && "home field", INJ_APPLIED.has(sport) && (F.injAdj || 0) > (U.injAdj || 0) && "injuries"].filter(Boolean);
+    out.push(`${nm(U)} is the better team on paper; ${nm(F)} is favored because of ${why.join(" and ") || "the matchup"}.`);
+  }
+
+  // 2. what the favorite's rating is made of
+  if (sport === "cfb") {
+    if (F.resultsRank && U.resultsRank) out.push(`On 2026 results alone ${nm(F)} ranks #${F.resultsRank} and ${nm(U)} #${U.resultsRank}` +
+      (Math.abs(F.rating - F.resultsOnly) > 3 ? `; ${nm(F)}'s rating still leans on its preseason prior (${fmt.sgn(F.preseason)}).` : "."));
+  } else if (F.off != null && U.off != null) {
+    const offE = F.off - U.off, defE = U.dfn - F.dfn;            // dfn = allowed vs average, lower is better
+    // "+1.9" -> "1.9 more", relative to league average, per game
+    const vs = v => Math.abs(v) < 0.005 ? "league average" : `${fmt.n(Math.abs(v), dp)} ${u}/game ${v > 0 ? "more" : "fewer"} than average`;
+    const sc = t => `scores ${vs(t.off)}`, al = t => `allows ${vs(t.dfn)}`;
+    if (offE > 0 && defE > 0 && Math.min(offE, defE) > 0.6 * Math.max(offE, defE))
+      out.push(`${nm(F)} better on both ends: ${sc(F)} and ${al(F)} (${nm(U)}: ${sc(U)}, ${al(U)}).`);
+    else if (Math.max(offE, defE) > 0) out.push(offE >= defE
+      ? `The edge is ${poss(F)} ${sport === "mlb" ? "lineup" : "offense"}: ${sc(F)} (${nm(U)}: ${vs(U.off)}).`
+      : `The edge is ${poss(F)} ${sport === "mlb" ? "run prevention" : "defense"}: ${al(F)} (${nm(U)}: ${vs(U.dfn)}).`);
+    else if (sport === "nhl") out.push(`Raw scoring is even or favors ${nm(U)}; ${poss(F)} edge comes from shot quality (xG) and goaltending.`);
+  }
+  const form = [F, U].map(t => {
+    const s = t.last10 || ""; if (s.length < 6) return null;
+    const w = [...s].filter(c => c === "W").length, r = w / s.length;
+    return r >= 0.8 ? `${nm(t)} won ${w} of last ${s.length}` : r <= 0.2 ? `${nm(t)} lost ${s.length - w} of last ${s.length}` : null;
+  }).filter(Boolean);
+  if (form.length) out.push(`Form: ${form.join("; ")} (the ratings already count these games).`);
+
+  // 3. against the book
+  const m = g.mkt;
+  if (m) {
+    if (!goals && m.spread != null) {
+      const diff = g.margin + m.spread, S = diff > 0 ? H : A, line = diff > 0 ? m.spread : -m.spread;
+      out.push(Math.abs(diff) < 1 ? `DraftKings agrees (${H.abbr} ${fmtSpread(m.spread)}).`
+        : `vs DraftKings ${H.abbr} ${fmtSpread(m.spread)}: the model is ${fmt.n(Math.abs(diff), 1)} pts higher on ${nm(S)}, so its side is ${S.abbr} ${fmtSpread(line)}.`);
+    } else if (noVigHome(m) != null) {
+      const bp = noVigHome(m), diff = g.pHome - bp, S = diff > 0 ? H : A;
+      out.push(Math.abs(diff) < 0.03 ? `DraftKings agrees (${H.abbr} ${fmt.pct(bp)} with the vig removed).`
+        : `vs DraftKings: model ${fmt.pct(diff > 0 ? g.pHome : 1 - g.pHome)} on ${nm(S)} to the book's ${fmt.pct(diff > 0 ? bp : 1 - bp)}, so its side is ${S.abbr} ${fmtML(diff > 0 ? m.mlH : m.mlA)}.`);
+    }
+    const tot = sport !== "cfb" && g.projHome != null ? g.projHome + g.projAway : null;
+    if (tot != null && m.total != null && Math.abs(tot - m.total) >= (goals ? 0.4 : 3))
+      out.push(`Total: projects ${fmt.n(tot, 1)} vs O/U ${m.total}, so it leans ${tot > m.total ? "over" : "under"}.`);
+  }
+  if (sport === "mlb") out.push("Team-level model: it doesn't know who's pitching, so check the starters.");
+  return { title: flip ? "Why it's a coin flip" : `Why the model likes ${F.abbr || nm(F)}`, parts: out };
+}
+function whyBox(sport, d, g, open) {
+  const w = whyParts(sport, d, g);
+  if (!w) return null;
+  const el = h("details", { class: "why", open: open?.has(g.id) },
+    h("summary", {}, w.title), h("ul", {}, w.parts.map(p => h("li", {}, p))));
+  if (open) el.addEventListener("toggle", () => el.open ? open.add(g.id) : open.delete(g.id));
+  return el;
 }
 function injLine(...ts) {
   const hit = ts.filter(t => t.injAdj);

@@ -198,6 +198,13 @@ table.t td.wrap { white-space: normal; min-width: 220px; max-width: 360px; }
 .chip.book { background: #1f7a3a; color: #fff; }
 .board { min-height: 320px; }
 .inj-note { margin-top: 8px; font-size: 12px; color: var(--warn); }
+.why { margin-top: 8px; font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 6px; }
+.why summary { cursor: pointer; color: var(--accent); font-weight: 600; list-style: none; }
+.why summary::-webkit-details-marker { display: none; }
+.why summary::before { content: "▸ "; }
+.why[open] summary::before { content: "▾ "; }
+.why ul { margin: 6px 0 0; padding-left: 18px; color: var(--text); line-height: 1.45; }
+.why li + li { margin-top: 3px; }
 
 /* home */
 .home-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
