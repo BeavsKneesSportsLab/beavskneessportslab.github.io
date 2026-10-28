@@ -45,11 +45,22 @@ Views.ratings = async (sport) => {
   );
 };
 
+/* MLB probable starter under the team name ("TBD" until announced) */
+function spLine(g, side) {
+  if (!g.sp && (g.sport || "") !== "mlb") return null;
+  const p = g.sp?.[side];
+  if (!p) return h("span", { class: "sp-line muted small" }, "SP TBD");
+  const era = (p.rec || "").split(",")[1]?.trim();
+  return h("span", { class: "sp-line muted small", title: `${p.name}${p.rec ? ` (${p.rec})` : ""}` },
+    `SP ${p.short || p.name}${era ? ` · ${era} ERA` : ""}`);
+}
 function gameCard(sport, d, g) {
   const H = team(d, g.home), A = team(d, g.away);
   const pH = g.pHome, pA = 1 - pH;
-  const row = (t, p, proj, fav) => h("div", { class: "game-row" + (fav ? " fav" : "") },
-    h("a", { class: "nm", href: `#/${sport}/team/${t.id}` }, logo(t), h("span", {}, (t.rank && sport === "cfb" && t.rank <= 25 ? `${t.rank} ` : "") + (t.short || t.name))),
+  const row = (t, p, proj, fav, side) => h("div", { class: "game-row" + (fav ? " fav" : "") },
+    h("a", { class: "nm", href: `#/${sport}/team/${t.id}` }, logo(t), h("span", { class: "nm-txt" },
+      h("span", {}, (t.rank && sport === "cfb" && t.rank <= 25 ? `${t.rank} ` : "") + (t.short || t.name)),
+      sport === "mlb" ? spLine({ ...g, sport }, side) : null)),
     h("span", { class: "proj" }, proj != null ? fmt.n(proj, sport === "nhl" || sport === "mlb" ? 1 : 0) : ""),
     h("span", { class: "pct" }, fmt.pct(p)));
   const projH = g.projHome, projA = g.projAway;
@@ -57,7 +68,7 @@ function gameCard(sport, d, g) {
   return h("div", { class: "game" },
     h("div", { class: "game-meta" }, h("span", {}, `${fmt.date(g.date)} · ${fmt.time(g.date)}`),
       h("span", {}, g.neutral ? "Neutral" : "", g.tv ? ` ${g.tv}` : "")),
-    row(A, pA, projA, pA > pH), row(H, pH, projH, pH >= pA),
+    row(A, pA, projA, pA > pH, "away"), row(H, pH, projH, pH >= pA, "home"),
     h("div", { class: "wp" }, h("i", { style: { width: `${pA * 100}%`, background: A.color } }),
       h("i", { style: { width: `${pH * 100}%`, background: H.color } })),
     h("div", { class: "game-foot" }, h("span", {}, "Model: ", h("b", {}, spreadText(sport, d, g))),
@@ -69,7 +80,7 @@ function gameCard(sport, d, g) {
 }
 /* "Why" write-up: the model's own ingredients in plain words. A prediction is
    (rating + injury adj) home − (rating + injury adj) away + home edge, so the pieces listed add up to
-   the line shown. NHL lists injuries but applies them 0x; MLB has none (and no starting pitchers). */
+   the line shown. NHL lists injuries but applies them 0x; MLB has none (starters are shown, not priced). */
 const INJ_APPLIED = new Set(["nfl", "nba", "cfb"]);
 function whyParts(sport, d, g) {
   const H = team(d, g.home), A = team(d, g.away);
@@ -140,7 +151,11 @@ function whyParts(sport, d, g) {
     if (tot != null && m.total != null && Math.abs(tot - m.total) >= (goals ? 0.4 : 3))
       out.push(`Total: projects ${fmt.n(tot, 1)} vs O/U ${m.total}, so it leans ${tot > m.total ? "over" : "under"}.`);
   }
-  if (sport === "mlb") out.push("Team-level model: it doesn't know who's pitching, so check the starters.");
+  if (sport === "mlb") {
+    const a = g.sp?.away?.name, hm = g.sp?.home?.name;
+    out.push(a && hm ? `Team-level model: the line doesn't adjust for today's starters (${a} vs ${hm}), so weigh that matchup yourself.`
+      : "Team-level model: it doesn't know who's pitching, so check the starters.");
+  }
   return { title: flip ? "Why it's a coin flip" : `Why the model likes ${F.abbr || nm(F)}`, parts: out };
 }
 function whyBox(sport, d, g, open) {

@@ -322,3 +322,6 @@ a.osu-ev:hover .osu-opp span { text-decoration: underline; }
 .card .story-lead img { max-height: 340px; }
 .osu-sp { display: none; }
 @media (max-width: 600px) { .osu-sp { display: block; color: var(--accent); font-weight: 600; } }
+/* MLB probable starter under the team name */
+.nm .nm-txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.nm .nm-txt .sp-line { font-weight: 400; font-size: 11.5px; }

@@ -57,7 +57,7 @@ async function freshGames(home) {
       const close = 1 - 2 * Math.abs((g.pHome ?? 0.5) - 0.5);
       const tv = (g.tv || "").split(",").some(x => NATIONAL.has(x.trim())) ? 0.15 : 0;
       const score = (0.6 * strength + 0.3 * close + tv + (g.stype === 3 ? 0.35 : 0)) * SPORT_W[sp] - 0.25 * day;
-      pool.push({ sport: sp, id: g.id, date: g.date, day, score, home: H, away: A, margin: g.margin, pHome: g.pHome,
+      pool.push({ sport: sp, id: g.id, date: g.date, day, score, home: H, away: A, margin: g.margin, pHome: g.pHome, sp: g.sp,
                   mkt: g.mkt, tv: g.tv, neutral: g.neutral, unit: d.unit,
                   injNotes: [H, A].filter(t => t.injAdj).flatMap(t => t.injNotes || []) });
     }
@@ -76,9 +76,10 @@ function featuredCard(g, live, big, why) {
   const goals = g.sport === "nhl" || g.sport === "mlb";
   const fav = g.margin >= 0 ? H : A, m = Math.abs(g.margin || 0);
   const modelTxt = m < (goals ? 0.03 : 0.25) ? "Pick'em" : goals ? `${fav.abbr} ${fmt.pct(Math.max(pH, 1 - pH))}` : `${fav.abbr} -${(Math.round(m * 2) / 2).toFixed(1)}`;
-  const row = (t, score, p) => h("div", { class: "fg-row" },
+  const row = (t, score, p, side) => h("div", { class: "fg-row" },
     h("a", { class: "nm", href: `#/${g.sport}/team/${t.id}` }, logo(t, big ? "md" : ""),
-      h("span", {}, g.sport === "cfb" && t.rank && t.rank <= 25 ? h("span", { class: "rank" }, t.rank) : null, t.short || t.name),
+      h("span", { class: "nm-txt" }, h("span", {}, g.sport === "cfb" && t.rank && t.rank <= 25 ? h("span", { class: "rank" }, t.rank) : null, t.short || t.name),
+        spLine(g, side)),
       h("span", { class: "muted small" }, g.sport === "cfb" ? t.record || "" : t.w != null ? fmt.rec(t) : "")),
     state === "pre" ? h("span", { class: "pct" }, fmt.pct(p)) : h("b", { class: "score" }, score ?? "–"));
   const status = state === "in" ? h("span", { class: "chip live" }, h("span", { class: "live-dot" }), L.detail || "Live")
@@ -87,7 +88,7 @@ function featuredCard(g, live, big, why) {
   return h("div", { class: "fg" + (big ? " big" : "") },
     h("div", { class: "fg-top" }, h("span", { class: "chip league" }, SPORTS[g.sport].name), status, g.tv ? h("span", { class: "muted small" }, g.tv.split(",")[0]) : null),
     big ? h("div", { class: "fg-kicker" }, "Game of the day") : null,
-    row(A, L.as, 1 - pH), row(H, L.hs, pH),
+    row(A, L.as, 1 - pH, "away"), row(H, L.hs, pH, "home"),
     h("div", { class: "fg-foot" },
       h("span", {}, "Model ", h("b", {}, modelTxt)),
       g.mkt ? h("span", {}, "DK ", h("b", {}, goals || g.mkt.spread == null ? `${fmtML(g.mkt.mlA)}/${fmtML(g.mkt.mlH)}` : `${H.abbr} ${fmtSpread(g.mkt.spread)}`)) : null,
