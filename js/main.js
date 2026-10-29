@@ -34,7 +34,7 @@ async function route() {
   $("#app").replaceChildren(h("div", { class: "loading" }, "Loading…"));
   try {
     if (tab === "pickem") await Pickem.view();
-    else if (tab === "beavers") await OSU.view();
+    else if (tab === "beavers") await (parts[1] ? OSU.team(parts[1]) : OSU.view());
     else if (!sport) await Views.home();
     else if (ROUTES[tab]) await ROUTES[tab](sport, parts.slice(2));
     else mount(h("div", { class: "card empty" }, "Unknown page."));

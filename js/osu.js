@@ -29,7 +29,116 @@ function osuStory(s, lead) {
     h("div", {}, h("div", { class: "story-h" }, s.title), meta));
 }
 
+/* team pages (#/beavers/<code>): full roster + every season's schedule, from data/osu_teams.json */
+const osuDay = (iso, opts) => new Date(iso.slice(0, 10) + "T12:00:00Z").toLocaleDateString(undefined, { timeZone: "UTC", ...opts });
+const osuRec = r => r && r !== "0-0" ? r : null;
+
+function osuGameRow(g, next) {
+  const past = (g.end || g.date).slice(0, 10) < new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+  const multi = g.end && g.end.slice(0, 10) !== g.date.slice(0, 10);
+  const when = osuDay(g.date, { weekday: "short", month: "short", day: "numeric" }) + (multi ? ` – ${osuDay(g.end, { month: "short", day: "numeric" })}` : "");
+  const res = g.res ? h("b", { class: g.res === "W" ? "pos" : g.res === "L" ? "neg" : "" }, `${g.res} ${g.us ?? ""}${g.them != null ? `-${g.them}` : ""}`)
+    : g.info ? h("span", { class: "small" }, g.info)
+    : past ? h("span", { class: "muted small" }, "—")
+    : h("span", { class: "muted small" }, next ? h("span", { class: "chip accent", style: { marginRight: "6px" } }, "Next") : null,
+        g.time && !/^(TBA|All Day)$/i.test(g.time) ? `${g.time} PT` : g.time || "TBA");
+  const links = [g.link && h("a", { class: "link small", href: g.link, target: "_blank", rel: "noopener" }, g.res || g.info ? "Recap" : "Preview"),
+                 g.box && g.box !== g.link && h("a", { class: "link small", href: g.box, target: "_blank", rel: "noopener" }, "Box")].filter(Boolean);
+  return h("tr", { class: next ? "osu-next" : "" },
+    h("td", { class: "muted small nowrap" }, when),
+    h("td", {}, h("div", { class: "osu-opp" }, g.logo ? h("img", { class: "logo", src: g.logo, alt: "", loading: "lazy" }) : h("span", { class: "logo" }),
+      h("span", {}, `${g.atVs ? g.atVs + " " : ""}${g.opp}`, g.conf ? h("span", { class: "muted", title: "Conference game" }, " *") : null,
+        g.exh ? h("span", { class: "chip", style: { marginLeft: "6px" } }, "Exh") : null)),
+      h("div", { class: "muted small osu-loc" }, [g.loc, g.tv].filter(Boolean).join(" · "))),
+    h("td", { class: "right nowrap" }, res, links.length ? h("div", { class: "osu-links" }, links) : null));
+}
+
+function osuPlayer(p) {
+  const bits = [p.posLong || p.pos, p.yr, p.ht, p.wt ? `${p.wt} lbs` : null].filter(Boolean).join(" · ");
+  return h("a", { class: "osu-pl", href: p.link, target: "_blank", rel: "noopener" },
+    p.img ? h("img", { src: p.img, alt: "", loading: "lazy" }) : h("span", { class: "osu-pl-ph" }, "🦫"),
+    h("div", { class: "osu-pl-body" },
+      h("div", { class: "osu-pl-name" }, p.num ? h("span", { class: "osu-num" }, `#${p.num}`) : null, `${p.first || ""} ${p.last || ""}`,
+        p.capt ? h("span", { class: "chip osu-off", title: "Captain" }, "C") : null),
+      h("div", { class: "muted small" }, bits),
+      h("div", { class: "muted small" }, [p.town, p.prev ? `from ${p.prev}` : p.hs].filter(Boolean).join(" · "))));
+}
+
+async function osuTeamView(code) {
+  const d = await load("osu_teams");
+  const t = d.teams.find(x => x.code === code);
+  if (!t) return mount(h("div", { class: "card empty" }, "No team by that name. ", h("a", { class: "link", href: "#/beavers" }, "Back to Beavers →")));
+  const seasons = t.seasons || [];
+  let si = 0, tab = "schedule", q = "";
+  const body = h("div");
+  const draw = () => {
+    if (tab === "schedule") {
+      const s = seasons[si];
+      if (!s) return body.replaceChildren(h("div", { class: "card empty" }, "No schedule posted."));
+      const r = s.record || {}, played = s.games.filter(g => g.res);
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+      const nextG = s.games.find(g => !g.res && !g.info && (g.end || g.date).slice(0, 10) >= today);
+      const w = played.filter(g => g.res === "W").length, l = played.filter(g => g.res === "L").length, tt = played.filter(g => g.res === "T").length;
+      const recTxt = osuRec(r.overall) || (played.length ? `${w}-${l}${tt ? `-${tt}` : ""}` : null);
+      body.replaceChildren(h("div", { class: "card" },
+        h("div", { class: "card-head" },
+          h("select", { class: "osu-season", onchange: e => { si = +e.target.value; draw(); } },
+            seasons.map((x, i) => h("option", { value: i, selected: i === si ? "" : null }, x.title))),
+          h("span", { class: "muted small" }, [recTxt && `Record ${recTxt}`, osuRec(r.conference) && `Conf ${r.conference}`,
+            osuRec(r.home) && `Home ${r.home}`, osuRec(r.away) && `Away ${r.away}`, r.streak && r.streak !== "-" && recTxt ? `Streak ${r.streak}` : null,
+            `${s.games.length} events`].filter(Boolean).join(" · "))),
+        h("div", { class: "table-wrap" }, h("table", { class: "osu-sched-t" }, h("tbody", {}, s.games.map(g => osuGameRow(g, g === nextG))))),
+        h("div", { class: "muted small", style: { marginTop: "8px" } }, "* conference game", s.note ? ` · ${s.note}` : "")));
+    } else {
+      const R = t.roster;
+      if (!R) return body.replaceChildren(h("div", { class: "card empty" }, "No roster posted."));
+      const needle = q.toLowerCase();
+      const ps = R.players.filter(p => !needle || [p.first, p.last, p.num, p.pos, p.posLong, p.town, p.prev, p.hs].join(" ").toLowerCase().includes(needle))
+        .sort((a, b) => (parseInt(a.num) || 999) - (parseInt(b.num) || 999) || (a.last || "").localeCompare(b.last || ""));
+      const grid = h("div", { class: "osu-pl-grid" }, ps.length ? ps.map(osuPlayer) : h("div", { class: "empty" }, "No players match."));
+      body.replaceChildren(
+        h("div", { class: "card" },
+          h("div", { class: "card-head" }, h("h2", {}, R.title || "Roster"),
+            h("span", { class: "muted small" }, `${R.players.length} players`)),
+          grid),
+        R.coaches?.length ? h("div", { class: "card", style: { marginTop: "16px" } },
+          h("div", { class: "card-head" }, h("h2", {}, "Coaching staff")),
+          h("div", { class: "osu-pl-grid" }, R.coaches.map(c => h("div", { class: "osu-pl" },
+            c.img ? h("img", { src: c.img, alt: "", loading: "lazy" }) : h("span", { class: "osu-pl-ph" }, "🦫"),
+            h("div", { class: "osu-pl-body" }, h("div", { class: "osu-pl-name" }, c.name), h("div", { class: "muted small" }, c.title)))))) : null);
+    }
+  };
+  const search = h("input", { class: "osu-search", type: "search", placeholder: "Search name, number, position, hometown…",
+    oninput: e => { q = e.target.value; draw(); } });
+  const tabs = h("div", { class: "osu-chips" });
+  const drawTabs = () => tabs.replaceChildren(
+    ...[["schedule", "Schedule & results"], ["roster", "Roster"]].map(([k, label]) =>
+      h("button", { class: "chip" + (k === tab ? " on" : ""), onclick: () => { tab = k; search.hidden = k !== "roster"; drawTabs(); draw(); } }, label)),
+    search);
+  search.hidden = true;
+  drawTabs();
+  draw();
+  const cur = seasons[0]?.record?.overall, last = seasons.find((s, i) => i > 0 && osuRec(s.record?.overall));
+  mount(
+    h("div", { class: "home-head" }, h("img", { class: "home-logo", src: "img/beaver-full.jpg", alt: "" }),
+      h("div", {}, h("div", { class: "muted small" }, h("a", { class: "link", href: "#/beavers" }, "🦫 Beavers"), " / Teams"),
+        h("h1", {}, `Oregon State ${t.title}`),
+        h("div", { class: "muted" }, [osuRec(cur) ? `${seasons[0].title.replace(/ Schedule$/, "")}: ${cur}` : null,
+          last ? `${last.title.replace(/ Schedule$/, "")}: ${last.record.overall}` : null,
+          t.roster ? `${t.roster.players.length} on the roster` : null].filter(Boolean).join(" · ")))),
+    osuTeamLinks(code), tabs, body,
+    h("div", { class: "note" }, "Rosters, schedules and results from the official athletics site (osubeavers.com). Player cards link to official bios."));
+}
+
+function osuTeamLinks(active) {
+  const box = h("div", { class: "osu-teams" }, h("span", { class: "muted small" }, "Teams:"));
+  load("osu_teams").then(d => box.append(...d.teams.map(t =>
+    h("a", { class: "chip" + (t.code === active ? " on" : ""), href: `#/beavers/${t.code}` }, t.short.replace(/^W /, "W. ").replace(/^M /, "M. "))))).catch(() => box.remove());
+  return box;
+}
+
 const OSU = {
+  team: osuTeamView,
   async view() {
     const d = await load("osu");
     const sched = d.schedule || { recent: [], upcoming: [] };
@@ -65,7 +174,7 @@ const OSU = {
       h("div", { class: "home-head" }, h("img", { class: "home-logo", src: "img/beaver-full.jpg", alt: "" }),
         h("div", {}, h("h1", {}, "Oregon State Beavers"),
           h("div", { class: "muted" }, `News and scores from every sport · updated ${fmt.ago(d.generated)}`))),
-      chips, body,
+      osuTeamLinks(null), chips, body,
       h("div", { class: "note" }, "Stories link to their original source: osubeavers.com, OregonLive, BeaverBlitz (On3) and outlets found through Google News. Schedule and results from the official athletics calendar."));
   },
   /* home page card: latest headlines + the next few games */
