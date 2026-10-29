@@ -142,6 +142,7 @@ Views.home = async () => {
   _homeTimer = setInterval(() => { if (location.hash.replace(/^#\/?/, "") === "") liveScores(home.games).then(drawGames); else clearInterval(_homeTimer); }, 60000);
 
   const osuCard = await OSU.homeCard().catch(() => null);
+  const picksCard = await Picks.homeCard().catch(() => null);
   const storiesBox = h("div", {}, storyList(home.stories || []));
   liveStories(home.stories || []).then(s => storiesBox.replaceChildren(storyList(s)));
 
@@ -165,6 +166,7 @@ Views.home = async () => {
       h("div", { class: "home-links" }, HOME_SPORTS.map(k => h("a", { class: "chip", href: `#/${k}/${k === "cfb" ? "ratings" : "predictions"}` }, SPORTS[k].name)))),
     h("section", {}, h("div", { class: "card-head" }, h("h2", {}, "Today's biggest games"),
       h("span", { class: "muted small" }, h("span", { class: "live-dot" }), "Live scores update every minute")), gamesBox),
+    picksCard,
     h("div", { class: "home-grid" },
       h("div", { class: "card" }, h("div", { class: "card-head" }, h("h2", {}, "Top stories"), h("span", { class: "muted small" }, "via ESPN")), storiesBox),
       h("div", { class: "home-side" }, osuCard, topicCard)),
