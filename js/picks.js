@@ -37,10 +37,36 @@ const Picks = {
     box.replaceChildren(this.week(d, weeks[weeks.length - 1]));
     return h("section", { class: "card ppicks" },
       h("div", { class: "card-head" }, h("h2", {}, `🎯 ${PICKS_TITLE}`), sel),
+      this.season(d),
       box,
       h("div", { class: "ppicks-foot" },
         h("span", { class: "muted small" }, "Lines are the prices Parker took; \"DK now\" is DraftKings' current line. Results graded against Parker's line, at -110. This is not betting advice. Please play responsibly."),
         h("a", { class: "btn sm", href: "#/pickem" }, "Think you can pick better? Play Pick'em →")));
+  },
+
+  /* season strip: record, units, ROI, best/worst week and a running-units bar per week */
+  season(d) {
+    const G = Object.keys(PICK_WEEKS).map(Number).sort((a, b) => a - b)
+      .map(wk => ({ wk, ...this.grade(d, PICK_WEEKS[wk]) })).filter(g => g.graded);
+    if (!G.length) return null;
+    const sum = k => G.reduce((s, g) => s + g[k], 0);
+    const w = sum("w"), l = sum("l"), p = sum("p"), net = sum("net"), risk = sum("risked");
+    const best = G.reduce((a, b) => b.net > a.net ? b : a), worst = G.reduce((a, b) => b.net < a.net ? b : a);
+    let run = 0;
+    const pts = G.map(g => ({ wk: g.wk, net: g.net, run: (run += g.net) }));
+    const top = Math.max(1, ...pts.map(x => Math.abs(x.net)));
+    const u = x => `${x >= 0 ? "+" : ""}${x.toFixed(2)}U`;
+    return h("div", { class: "pseason" },
+      h("div", { class: "pseason-stats" },
+        h("div", {}, h("b", {}, `${w}-${l}${p ? `-${p}` : ""}`), h("span", {}, "Season record")),
+        h("div", {}, h("b", { class: net >= 0 ? "pos" : "neg" }, u(net)), h("span", {}, "Units")),
+        h("div", {}, h("b", { class: net >= 0 ? "pos" : "neg" }, `${net >= 0 ? "+" : ""}${(100 * net / Math.max(1, risk)).toFixed(1)}%`), h("span", {}, "Return on risk")),
+        G.length > 1 ? h("div", {}, h("b", {}, `Wk ${best.wk} ${u(best.net)}`), h("span", {}, "Best week")) : null,
+        G.length > 1 ? h("div", {}, h("b", {}, `Wk ${worst.wk} ${u(worst.net)}`), h("span", {}, "Worst week")) : null),
+      h("div", { class: "pseason-bars", role: "img", "aria-label": "Units won or lost each week" },
+        pts.map(x => h("div", { class: "pbar", title: `Week ${x.wk}: ${u(x.net)} (season ${u(x.run)})` },
+          h("div", { class: "pbar-col" }, h("i", { class: x.net >= 0 ? "up" : "down", style: { height: `${Math.max(3, 46 * Math.abs(x.net) / top)}%` } })),
+          h("span", {}, `Wk ${x.wk}`)))));
   },
 
   week(d, wk) {
@@ -58,9 +84,11 @@ const Picks = {
       h("div", { class: "ppick-grid" }, G.rows));
   },
 
+  /* -> {rows, results: [{game, team, res}], w, l, p, net, risked, graded, summary} */
   grade(d, P) {
     const games = Object.fromEntries([...d.schedule, ...d.predictions].map(g => [g.id, g]));   // predictions carry the live mkt
-    let w = 0, l = 0, p = 0, net = 0;
+    let w = 0, l = 0, p = 0, net = 0, risked = 0;
+    const results = [];
     const rows = P.picks.map(pk => {
       const g = games[pk.game];
       if (!g) return null;
@@ -70,6 +98,8 @@ const Picks = {
       if (g.state === "post" && g.hs != null) {
         const us = home ? g.hs : g.as, them = home ? g.as : g.hs, m = us + pk.line - them;
         res = m > 0 ? "W" : m < 0 ? "L" : "P";
+        results.push({ game: pk.game, team: pk.team, res });
+        if (res !== "P") risked += pk.units;
         if (res === "W") { w++; net += pk.units * 100 / 110; } else if (res === "L") { l++; net -= pk.units; } else p++;
         res = h("span", { class: "chip " + (res === "W" ? "good" : res === "L" ? "bad" : "") },
           `${res === "W" ? "Win" : res === "L" ? "Loss" : "Push"} · ${T.abbr} ${us}-${them}`);
@@ -84,7 +114,7 @@ const Picks = {
         h("p", {}, pk.text));
     }).filter(Boolean);
     const units = P.picks.reduce((s, x) => s + x.units, 0);
-    return { rows, units, graded: w + l + p,
+    return { rows, results, w, l, p, net, risked, units, graded: w + l + p,
              summary: `${w}-${l}${p ? `-${p}` : ""} · ${net >= 0 ? "+" : ""}${net.toFixed(2)}U` };
   },
 };

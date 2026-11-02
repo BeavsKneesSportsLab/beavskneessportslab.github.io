@@ -58,7 +58,7 @@ function spLine(g, side) {
   return h("span", { class: "sp-line muted small", title: `${p.name}${p.rec ? ` (${p.rec})` : ""}` },
     `SP ${p.short || p.name}${era ? ` · ${era} ERA` : ""}`);
 }
-function gameCard(sport, d, g) {
+function gameCard(sport, d, g, L) {
   const H = team(d, g.home), A = team(d, g.away);
   const pH = g.pHome, pA = 1 - pH;
   const row = (t, p, proj, fav, side) => h("div", { class: "game-row" + (fav ? " fav" : "") },
@@ -72,6 +72,9 @@ function gameCard(sport, d, g) {
   return h("div", { class: "game" },
     h("div", { class: "game-meta" }, h("span", {}, `${fmt.date(g.date)} · ${fmt.time(g.date)}`),
       h("span", {}, g.neutral ? "Neutral" : "", g.tv ? ` ${g.tv}` : "")),
+    L && L.state !== "pre" && L.hs != null ? h("div", { class: "live-line" },
+      L.state === "in" ? h("span", { class: "chip live" }, h("span", { class: "live-dot" }), L.detail || "Live") : h("span", { class: "chip" }, L.detail || "Final"),
+      h("b", {}, `${A.abbr} ${L.as} - ${H.abbr} ${L.hs}`)) : null,
     row(A, pA, projA, pA > pH, "away"), row(H, pH, projH, pH >= pA, "home"),
     h("div", { class: "wp" }, h("i", { style: { width: `${pA * 100}%`, background: A.color } }),
       h("i", { style: { width: `${pH * 100}%`, background: H.color } })),
@@ -225,15 +228,22 @@ Views.predictions = async (sport) => {
   if (sport === "cfb") {
     preds = preds.map(g => ({ ...g, projHome: (d.leagueAvg * 2) / 2 + g.margin / 2, projAway: d.leagueAvg - g.margin / 2 }));
   }
-  let filter = "all";
+  let filter = "all", live = {};
   const box = h("div", { class: "games" });
+  // live scores for games that have started or start today, refreshed every minute while this page is open
+  const route0 = location.hash;
+  const liveGames = () => preds.filter(g => new Date(g.date) <= new Date(Date.now() + 864e5)).map(g => ({ ...g, sport }));
+  const poll = () => { if (location.hash !== route0) return clearInterval(timer);
+    const gs = liveGames(); if (gs.length) liveScores(gs).then(x => { live = x; draw(); }); };
+  const timer = setInterval(poll, 60000);
+  setTimeout(poll, 0);
   const draw = () => {
     let ps = preds;
     if (filter === "top" && isCollege(sport)) ps = ps.filter(g => team(d, g.home).ap || team(d, g.away).ap);
     if (filter === "close") ps = ps.filter(g => Math.abs(g.pHome - 0.5) < 0.12);
     if (filter === "disagree") ps = ps.filter(g => noVigHome(g.mkt) != null)
       .sort((a, b) => Math.abs(b.pHome - noVigHome(b.mkt)) - Math.abs(a.pHome - noVigHome(a.mkt)));
-    box.replaceChildren(...(ps.length ? ps.map(g => gameCard(sport, d, g)) : [h("div", { class: "empty" }, "No upcoming games in the window.")]));
+    box.replaceChildren(...(ps.length ? ps.map(g => gameCard(sport, d, g, live[g.id])) : [h("div", { class: "empty" }, "No upcoming games in the window.")]));
   };
   draw();
   mount(
@@ -390,7 +400,8 @@ Views.team = async (sport, id) => {
   const stat = (v, l) => h("div", { class: "stat" }, h("b", {}, v), h("span", {}, l));
   mount(
     h("div", { class: "team-hero", style: { background: `linear-gradient(120deg, ${t.color}, ${t.alt === t.color ? "#111" : shade(t.color)})` } },
-      logo(t, "lg"), h("div", {}, h("h1", {}, t.name), h("div", { style: { opacity: .85 } }, [college ? t.conf : t.standing, t.venue].filter(Boolean).join(" · "))),
+      logo(t, "lg"), h("div", {}, h("h1", {}, t.name), h("div", { style: { opacity: .85 } }, [college ? t.conf : t.standing, t.venue].filter(Boolean).join(" · ")),
+        MyTeams.button(sport, t)),
       h("div", { class: "stats" }, stat(isCfb ? t.record || "–" : fmt.rec(t), "Record"), stat(`#${t.rank ?? "–"}`, "Power rank"), college ? stat(t.ap ? `#${t.ap}` : "NR", "AP poll") : null,
         stat(fmt.sgn(t.now ?? t.rating, sport === "nhl" || sport === "mlb" ? 2 : 1), "Rating"),
         isCfb ? stat(fmt.n(t.projW), "Proj. wins") : sport === "cbb" ? stat(`${t.confRec[0]}-${t.confRec[1]}`, `${t.conf} record`) : stat(fmt.money(t.payroll), "Payroll"))),

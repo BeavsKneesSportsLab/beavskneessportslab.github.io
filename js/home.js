@@ -124,6 +124,7 @@ function giscusInto(box, term) {
 
 Views.home = async () => {
   clearInterval(_homeTimer);
+  const here = stillOn();
   const home = await load("home").catch(() => ({ games: [], stories: [], topic: null }));
   home.games = await freshGames(home);
   const [cfb, ledger, poll] = await Promise.all([sportData("cfb").catch(() => null), load("ledger_cfb").catch(() => null), load("cfb_poll").catch(() => null)]);
@@ -143,6 +144,7 @@ Views.home = async () => {
 
   const osuCard = await OSU.homeCard().catch(() => null);
   const picksCard = await Picks.homeCard().catch(() => null);
+  const favCard = await MyTeams.homeCard().catch(() => null);
   const ballotCard = await Ballot.homeCard().catch(() => null);
   const storiesBox = h("div", {}, storyList(home.stories || []));
   liveStories(home.stories || []).then(s => storiesBox.replaceChildren(storyList(s)));
@@ -161,12 +163,14 @@ Views.home = async () => {
   const top = ranked.slice(0, 10), bottom = ranked.slice(-10);
   const s = ledger?.summary;
   const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  if (!here()) return;
   mount(
     h("div", { class: "home-head" }, h("img", { class: "home-logo", src: "img/beaver-full.jpg", alt: "" }),
       h("div", {}, h("h1", {}, "Beavs Knees Sports Lab"), h("div", { class: "muted" }, today)),
       h("div", { class: "home-links" }, HOME_SPORTS.map(k => h("a", { class: "chip", href: `#/${k}/${k === "cfb" ? "ratings" : "predictions"}` }, SPORTS[k].name)))),
     h("section", {}, h("div", { class: "card-head" }, h("h2", {}, "Today's biggest games"),
       h("span", { class: "muted small" }, h("span", { class: "live-dot" }), "Live scores update every minute")), gamesBox),
+    favCard,
     picksCard,
     ballotCard,
     h("div", { class: "home-grid" },

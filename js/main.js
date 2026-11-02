@@ -18,7 +18,7 @@ function drawNav(sport, tab) {
 async function route() {
   const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   const sport = SPORTS[parts[0]] ? parts[0] : null;
-  const tab = sport ? parts[1] || (sport === "cfb" ? "ratings" : "predictions") : ["pickem", "beavers"].includes(parts[0]) ? parts[0] : null;
+  const tab = sport ? parts[1] || (sport === "cfb" ? "ratings" : "predictions") : ["pickem", "beavers", "about"].includes(parts[0]) ? parts[0] : null;
   drawNav(sport, tab);
   const meta = await load("meta").catch(() => ({}));
   const m = sport && meta[sport];
@@ -29,11 +29,12 @@ async function route() {
     banner.hidden = !bad.length;
     banner.textContent = bad.length ? `Heads up: ${bad.map(([k]) => SPORTS[k]?.name || k).join(", ")} data hasn't refreshed since ${fmt.ago(bad[0][1].built)}. Numbers may be out of date.` : "";
   }
-  $("#foot").textContent = (m ? `${SPORTS[sport].full} data built ${fmt.ago(m.built)}${m.status !== "ok" ? ` - LAST BUILD ${m.status.toUpperCase()}, showing older data` : ""}. ` : "") +
-    "Beavs Knees Sports Lab - independent fan project, not affiliated with Oregon State University or any league. Sources: ESPN, NHL & MLB stats APIs, osubeavers.com, CollegeFootballData, Trade Rumors network. Ratings are our own models. For fun and analysis, not betting advice.";
+  $("#foot").replaceChildren(h("a", { class: "link", href: "#/about" }, "How it works"), " · ", (m ? `${SPORTS[sport].full} data built ${fmt.ago(m.built)}${m.status !== "ok" ? ` - LAST BUILD ${m.status.toUpperCase()}, showing older data` : ""}. ` : "") +
+    "Beavs Knees Sports Lab - independent fan project, not affiliated with Oregon State University or any league. Sources: ESPN, NHL & MLB stats APIs, osubeavers.com, CollegeFootballData, Trade Rumors network. Ratings are our own models. For fun and analysis, not betting advice.");
   $("#app").replaceChildren(h("div", { class: "loading" }, "Loading…"));
   try {
     if (tab === "pickem") await Pickem.view();
+    else if (tab === "about") About.view();
     else if (tab === "beavers") await (parts[1] ? OSU.team(parts[1]) : OSU.view());
     else if (!sport) await Views.home();
     else if (ROUTES[tab]) await ROUTES[tab](sport, parts.slice(2));

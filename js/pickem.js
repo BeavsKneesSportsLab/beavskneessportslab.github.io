@@ -81,6 +81,7 @@ function grade(pick, g) {
 }
 
 Pickem.view = async () => {
+  const here = stillOn();
   const D = Object.fromEntries(await Promise.all(PK_SPORTS.map(async s => [s, await sportData(s)])));
   const c = await sb().catch(() => null);
   if (!c) return mount(h("div", { class: "card empty" }, "Couldn't load the pick'em service. Try again in a minute."));
@@ -185,22 +186,53 @@ Pickem.view = async () => {
       { k: "pct", label: "Win %", num: true, fmt: r => fmt.pct(r.pct, 1) },
       { k: "u", label: "Units", num: true, fmt: r => h("b", { class: r.u >= 0 ? "pos" : "neg" }, fmt.sgn(r.u, 2)) },
     ];
-    const withModel = (rows, f) => { const m = modelRow(f); if (m) rows.push(m); return rows; };
+    // Parker's Picks of the Week on the same flat scale (+1 cover / -1 miss), CFB only
+    const cfbWeek = wk => `${D.cfb.season || 2026}-w${wk}`;
+    const parkerRow = weekKey => {
+      const a = { w: 0, l: 0, p: 0, u: 0 };
+      for (const wk of Object.keys(PICK_WEEKS)) {
+        if (weekKey && cfbWeek(wk) !== weekKey) continue;
+        for (const r of Picks.grade(D.cfb, PICK_WEEKS[wk]).results) {
+          if (r.res === "W") { a.w++; a.u += 1; } else if (r.res === "L") { a.l++; a.u -= 1; } else a.p++;
+        }
+      }
+      return a.w + a.l + a.p ? { who: "🎯 Parker's Picks", ...a, pct: a.w / Math.max(1, a.w + a.l), bot: true } : null;
+    };
+    const withModel = (rows, f, sp, wk) => {
+      const m = modelRow(f); if (m) rows.push(m);
+      if (!sp || sp === "cfb") { const pr = parkerRow(wk); if (pr) rows.push(pr); }
+      return rows; };
+    // latest finished slate per sport -> its winner
+    const champs = () => PK_SPORTS.map(sp => {
+      const keys = [...new Set(picks.filter(p => p.sport === sp).map(p => p.week))].sort().reverse();
+      for (const k of keys) {
+        const ps = picks.filter(p => p.sport === sp && p.week === k);
+        if (ps.some(p => !grade(p, sched[sp]?.[p.game_id]))) continue;           // slate still in progress
+        const top = rowsFor(p => p.sport === sp && p.week === k).sort((a, b) => b.u - a.u)[0];
+        if (top && top.u > 0) return { sp, k, top };
+      }
+      return null;
+    }).filter(Boolean);
     let boardSport = "all";
     const seasonBox = h("div"), periodBox = h("div"), periodSel = h("div");
     const drawSeason = () => {
       const f = boardSport === "all" ? null : p => p.sport === boardSport;
-      const rows = withModel(rowsFor(f), f);
+      const rows = withModel(rowsFor(f), f, boardSport === "all" ? null : boardSport);
       seasonBox.replaceChildren(rows.length ? table(cols, rows, { sort: "u" }) : h("div", { class: "empty" }, "No graded picks yet - results post the morning after games."));
       const keys = [...new Set(picks.filter(p => !f || f(p)).map(p => `${p.sport}|${p.week}`))].sort((a, b) => b.split("|")[1].localeCompare(a.split("|")[1]));
       const label = k => { const [sp, wk] = k.split("|"); return `${SPORTS[sp].name} ${/w\d+$/.test(wk) ? "week " + wk.split("w")[1] : new Date(wk + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}`; };
       const drawPeriod = k => { const [sp, wk] = k.split("|"); const f2 = p => p.sport === sp && p.week === wk;
-        const r2 = withModel(rowsFor(f2), f2);
+        const r2 = withModel(rowsFor(f2), f2, sp, wk);
         periodBox.replaceChildren(r2.length ? table(cols, r2, { sort: "u" }) : h("div", { class: "empty" }, "Nothing graded yet for that slate.")); };
       periodSel.replaceChildren(keys.length ? h("select", { class: "in", onchange: e => drawPeriod(e.target.value) }, keys.map(k => h("option", { value: k }, label(k)))) : "");
       if (keys.length) drawPeriod(keys[0]); else periodBox.replaceChildren(h("div", { class: "empty" }, "No slates played yet."));
     };
+    const slateName = (sp, wk) => `${SPORTS[sp].name} ${/w\d+$/.test(wk) ? "Week " + wk.split("w")[1] : new Date(wk + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+    const C = champs();
     body.replaceChildren(
+      C.length ? h("div", { class: "card champs" }, h("b", {}, "🏆 Latest champions"),
+        C.map(c => h("span", { class: "champ" }, h("span", { class: "muted small" }, slateName(c.sp, c.k)), " ", h("b", {}, c.top.who), " ",
+          h("span", { class: "pos small" }, fmt.sgn(c.top.u, 2))))) : null,
       h("div", { class: "toolbar" }, seg([["all", "All sports"], ...PK_SPORTS.map(s => [s, SPORTS[s].name])], boardSport, v => { boardSport = v; drawSeason(); })),
       h("div", { class: "grid g2" },
         h("div", { class: "card tight" }, h("h2", {}, "Season leaderboard"), seasonBox),
@@ -232,6 +264,7 @@ Pickem.view = async () => {
       } }, "Save"), msg));
   };
 
+  if (!here()) return;
   const draw = () => (tab === "slate" ? drawSlate() : drawBoard()).catch(e => body.replaceChildren(errorBox(e)));
   const drawSportSeg = () => sportSeg.replaceChildren(tab === "slate" ? seg(PK_SPORTS.map(s => [s, `${SPORTS[s].name}${S[s].length ? "" : " ·"}`]), sport,
     v => { sport = v; slateKey = S[v][0]?.key; draw(); }) : "");

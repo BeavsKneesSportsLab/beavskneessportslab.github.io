@@ -286,9 +286,10 @@ table.cmp td { font-size: 14px; } table.cmp td:first-child { text-align: right; 
 /* phones: sport tabs get their own full-width row so NHL and Pick'em aren't pushed off-screen */
 @media (max-width: 600px) {
   .top-inner { flex-wrap: wrap; gap: 6px 10px; padding: 8px 12px; }
-  .sports { order: 3; flex-basis: 100%; justify-content: space-between; gap: 2px; }
+  .sports { order: 3; flex-basis: 100%; flex-wrap: wrap; justify-content: center; gap: 2px; overflow: visible; }
   .sports a { padding: 6px 9px; font-size: 13.5px; }
-  .theme-btn { margin-left: auto; }
+  .theme-btn { margin-left: 0; }
+  .search-btn { margin-left: auto; }
   .brand span.full { display: block; }
   .brand small { font-size: 9px; } .brand b { font-size: 15px; }
   .brand-logo { width: 32px; height: 34px; }
@@ -388,3 +389,57 @@ a.osu-pl:hover { border-color: var(--accent); }
   .bmod { min-width: 0; }
 }
 .fg-row .nm-txt .rank { min-width: 0; margin-right: 5px; }
+
+/* Parker's picks: season strip */
+.pseason { display: flex; gap: 18px; align-items: flex-end; flex-wrap: wrap; padding: 10px 12px; margin: 0 0 12px; border: 1px solid var(--line); border-radius: 10px; }
+.pseason-stats { display: flex; gap: 10px 18px; flex-wrap: wrap; flex: 1 1 320px; }
+@media (max-width: 600px) { .pseason-stats { gap: 10px 14px; } .pseason-stats b { font-size: 15px; } }
+.pseason-stats div { display: flex; flex-direction: column; }
+.pseason-stats b { font-size: 17px; }
+.pseason-stats span { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.pseason-bars { display: flex; gap: 6px; align-items: stretch; height: 64px; }
+.pbar { display: flex; flex-direction: column; align-items: center; width: 34px; }
+.pbar-col { flex: 1; width: 16px; position: relative; border-bottom: 1px dashed var(--line); }
+.pbar-col i { position: absolute; left: 0; right: 0; border-radius: 3px; }
+.pbar-col i.up { bottom: 50%; background: var(--good, #2e9e5b); }
+.pbar-col i.down { top: 50%; background: var(--bad, #d64545); }
+.pbar span { font-size: 10px; color: var(--muted); margin-top: 2px; white-space: nowrap; }
+
+/* search */
+.search-btn { margin-left: auto; display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+.search-modal { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.55); display: flex; justify-content: center; align-items: flex-start; padding: 70px 16px 16px; }
+.search-box { width: min(560px, 100%); max-height: calc(100vh - 100px); overflow-y: auto; padding: 12px; }
+.search-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.search-in { flex: 1; min-width: 0; font-size: 16px; }
+.search-list { display: flex; flex-direction: column; gap: 2px; }
+.search-hit { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; color: inherit; }
+.search-hit.on, .search-hit:hover { background: var(--panel2); }
+.search-hit .logo { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.search-nm { font-weight: 600; margin-right: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-hit .muted { text-align: right; flex: none; max-width: 50%; }
+@media (max-width: 720px) { .search-lbl { display: none; } }
+
+/* My Teams */
+.fav-btn { margin-top: 8px; font: inherit; font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; cursor: pointer;
+  background: rgba(0,0,0,.35); color: #fff; border: 1px solid rgba(255,255,255,.45); }
+.fav-btn.on { background: #fff; color: #111; }
+.fav-card, .fav-hint { margin-top: 16px; }
+.fav-hint { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.fav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 8px; }
+.fav-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; color: inherit; min-width: 0; }
+.fav-row:hover { border-color: var(--accent); }
+.fav-main { flex: 1; min-width: 0; }
+.fav-main .chip { margin-left: 6px; }
+.fav-line { flex: none; font-weight: 600; text-align: right; }
+
+/* live score on prediction cards */
+.live-line { display: flex; align-items: center; gap: 8px; margin: 2px 0 6px; font-size: 13px; }
+
+/* pick'em champions */
+.champs { display: flex; align-items: center; gap: 8px 18px; flex-wrap: wrap; padding: 10px 14px; margin-bottom: 12px; }
+
+/* how it works */
+.about h2 { margin-top: 0; }
+.about-dl { margin: 0; }
+.about-dl dt { font-weight: 700; margin-top: 10px; }
+.about-dl dd { margin: 2px 0 0; color: var(--muted); }

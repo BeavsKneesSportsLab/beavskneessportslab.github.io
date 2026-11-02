@@ -62,6 +62,10 @@ function h(tag, attrs, ...kids) {
   return el;
 }
 const $ = (s, r = document) => r.querySelector(s);
+/* slow views (home, pick'em) take a guard when they start; it turns false once the visitor has moved to another
+   page, so a late mount() doesn't draw over the new one */
+const routeKey = () => location.hash.replace(/^#\/?/, "").split("/").filter(Boolean).slice(0, 2).join("/");
+function stillOn() { const k = routeKey(); return () => routeKey() === k; }
 function mount(...nodes) { const app = $("#app"); app.replaceChildren(...nodes.filter(n => n != null && n !== false)); window.scrollTo(0, 0); }
 
 function logo(t, cls = "") {
