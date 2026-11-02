@@ -1,11 +1,10 @@
-/* picks.js — "Parker's Picks of the Week" home card. Hand-written each week: edit WEEKLY_PICKS below.
+/* picks.js — "Parker's Picks of the Week" home card. Hand-written each week: add the new week to PICK_WEEKS below
+   (an empty picks list shows "Picks TBD"). Past weeks stay selectable with their graded record.
    Each pick names the ESPN game id and the picked team's id; kickoff, the current DraftKings line and
    the result (cover / loss / push against Parker's line) come from data/cfb.json. */
-const WEEKLY_PICKS = {
-  title: "Parker's Picks of the Week",
-  week: 9,
-  sport: "cfb",
-  picks: [
+const PICKS_TITLE = "Parker's Picks of the Week";
+const PICK_WEEKS = {
+  9: { sport: "cfb", picks: [
     { game: "401858509", team: "30", line: 6.5, units: 5,
       text: "Everyone is on Ohio State this week, and USC is coming off a bad loss to Wisconsin and has looked borderline awful. But Lincoln Riley's job is on the line, the public is all over an Ohio State team that's traveling across the country, and the Buckeyes are down to backup QB Luke Fahey with Julian Sayin out. Give me the Trojans to cover." },
     { game: "401858501", team: "135", line: 20.5, units: 4,
@@ -22,14 +21,44 @@ const WEEKLY_PICKS = {
       text: "This line opened around -7, but with no injury news or any other indicators it has slid to -5.5. Fresno State's last game was an embarrassing loss to a very weak San Diego State team (the same SDSU the Beavs beat 66-14), and with Oregon State coming off a bye, I just can't see the Bulldogs keeping this close. If the Beavs' Air Raid offense produces, this one will get ugly quick." },
     { game: "401858281", team: "59", line: 8.5, units: 2,
       text: "Pitt has dropped three in a row, including a 29-point loss to Miami last week. The public is fading the Yellow Jackets heavily in a season I'm sure they'd like to forget, but I have confidence that Alberto Mendoza, the younger brother of Heisman winner Fernando Mendoza, can get it done on the road." },
-  ],
+  ] },
+  10: { sport: "cfb", picks: [] },
 };
 
 const Picks = {
   async homeCard() {
-    const P = WEEKLY_PICKS;
-    const d = await sportData(P.sport).catch(() => null);
+    const d = await sportData("cfb").catch(() => null);
     if (!d) return null;
+    const weeks = Object.keys(PICK_WEEKS).map(Number).sort((a, b) => a - b);
+    const sel = h("select", { class: "ballot-week", "aria-label": "Picks week" },
+      weeks.slice().reverse().map(w => h("option", { value: w }, `Week ${w}`)));
+    const box = h("div", {});
+    sel.addEventListener("change", () => box.replaceChildren(this.week(d, +sel.value)));
+    box.replaceChildren(this.week(d, weeks[weeks.length - 1]));
+    return h("section", { class: "card ppicks" },
+      h("div", { class: "card-head" }, h("h2", {}, `🎯 ${PICKS_TITLE}`), sel),
+      box,
+      h("div", { class: "ppicks-foot" },
+        h("span", { class: "muted small" }, "Lines are the prices Parker took; \"DK now\" is DraftKings' current line. Results graded against Parker's line, at -110. This is not betting advice. Please play responsibly."),
+        h("a", { class: "btn sm", href: "#/pickem" }, "Think you can pick better? Play Pick'em →")));
+  },
+
+  week(d, wk) {
+    const P = PICK_WEEKS[wk];
+    if (!P.picks.length) {
+      const prev = PICK_WEEKS[wk - 1] && this.grade(d, PICK_WEEKS[wk - 1]);
+      return h("div", { class: "ppicks-tbd" },
+        h("p", {}, h("b", {}, `Week ${wk} picks: TBD.`), " Check back before kickoff."),
+        prev && prev.graded ? h("p", { class: "muted small" }, `Last week (Week ${wk - 1}): ${prev.summary}. Pick Week ${wk - 1} above to see the picks.`) : null);
+    }
+    const G = this.grade(d, P);
+    return h("div", {},
+      h("div", { class: "muted small", style: { margin: "0 0 8px" } },
+        G.graded ? `Week ${wk}: ${G.summary}` : `Week ${wk} · ${P.picks.length} picks · ${G.units}U`),
+      h("div", { class: "ppick-grid" }, G.rows));
+  },
+
+  grade(d, P) {
     const games = Object.fromEntries([...d.schedule, ...d.predictions].map(g => [g.id, g]));   // predictions carry the live mkt
     let w = 0, l = 0, p = 0, net = 0;
     const rows = P.picks.map(pk => {
@@ -55,15 +84,7 @@ const Picks = {
         h("p", {}, pk.text));
     }).filter(Boolean);
     const units = P.picks.reduce((s, x) => s + x.units, 0);
-    const graded = w + l + p;
-    return h("section", { class: "card ppicks" },
-      h("div", { class: "card-head" },
-        h("h2", {}, `🎯 ${P.title}`),
-        h("span", { class: "muted small" }, graded ? `Week ${P.week}: ${w}-${l}${p ? `-${p}` : ""} · ${net >= 0 ? "+" : ""}${net.toFixed(1)}U`
-          : `Week ${P.week} · ${P.picks.length} picks · ${units}U`)),
-      h("div", { class: "ppick-grid" }, rows),
-      h("div", { class: "ppicks-foot" },
-        h("span", { class: "muted small" }, "Lines are the prices Parker took; \"DK now\" is DraftKings' current line. Results graded against Parker's line, at -110. This is not betting advice. Please play responsibly."),
-        h("a", { class: "btn sm", href: "#/pickem" }, "Think you can pick better? Play Pick'em →")));
+    return { rows, units, graded: w + l + p,
+             summary: `${w}-${l}${p ? `-${p}` : ""} · ${net >= 0 ? "+" : ""}${net.toFixed(2)}U` };
   },
 };
