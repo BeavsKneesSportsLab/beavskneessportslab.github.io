@@ -3,7 +3,7 @@ const Views = {};
 
 Views.ratings = async (sport) => {
   const d = await sportData(sport);
-  const isCfb = sport === "cfb";
+  const isCfb = sport === "cfb", college = isCollege(sport);
   let conf = "", q = "";
   const rows = () => d.teams.filter(t => t.rating != null)
     .filter(t => !conf || t.conf === conf || t.group === conf)
@@ -13,13 +13,13 @@ Views.ratings = async (sport) => {
   const cols = [
     { k: "rank", label: "#", num: true, asc: true, fmt: t => h("span", { class: "rank" }, t.rank ?? "–") },
     { k: "name", label: "Team", asc: true, fmt: t => teamLink(sport, t) },
-    isCfb ? { k: "conf", label: "Conf", asc: true } : null,
+    college ? { k: "conf", label: "Conf", asc: true } : null,
     { k: "w", label: "Record", sort: t => isCfb ? parseInt(t.record) : t.w / Math.max(1, t.gp), fmt: t => isCfb ? t.record || "–" : fmt.rec(t) },
     { k: "rating", label: `Rating (${d.unit})`, num: true, sort: R,
       title: isCfb ? "Neutral-site margin vs an average team, with the current lineup (full strength + Inj adj)" : "Neutral-site margin vs an average team",
       fmt: t => h("span", { class: "mono", title: t.now != null && t.injAdj ? `Full strength ${fmt.sgn(t.rating)} (#${t.fullRank})` : null },
         fmt.sgn(R(t), sport === "nhl" || sport === "mlb" ? 2 : 1)) },
-    { k: "injAdj", label: "Inj adj", num: true, asc: true, title: "Points added/subtracted in predictions for injuries and QB changes (hover for detail)",
+    sport === "cbb" ? null : { k: "injAdj", label: "Inj adj", num: true, asc: true, title: "Points added/subtracted in predictions for injuries and QB changes (hover for detail)",
       fmt: t => t.injAdj ? h("span", { class: t.injAdj < 0 ? "neg" : "pos", title: (t.injNotes || []).join("\n"), style: { cursor: "help" } }, fmt.sgn(t.injAdj)) : h("span", { class: "muted" }, "–") },
     { k: "bar", label: "", nosort: true, fmt: t => h("div", { class: "diverge" }, h("i", { style: {
         left: R(t) >= 0 ? "50%" : `${50 - 50 * Math.abs(R(t)) / maxR}%`,
@@ -37,14 +37,15 @@ Views.ratings = async (sport) => {
   const confs = [...new Set(d.teams.map(t => t.conf).filter(Boolean))].sort();
   mount(
     h("h1", {}, `${SPORTS[sport].full} Power Ratings`),
-    h("p", { class: "lede" }, d.method + (isCfb ? ` · Through week ${d.asOfWeek}.` : "") +
+    h("p", { class: "lede" }, d.method + (isCfb ? ` · Through week ${d.asOfWeek}.` : sport === "cbb" ? "." : "") +
       ` Rating = expected margin vs an average team on a neutral field; home edge ${fmt.n(d.hfa, 2)} ${d.unit}.`),
     h("div", { class: "toolbar" },
       h("input", { placeholder: "Search team…", oninput: e => { q = e.target.value.toLowerCase(); tbl.redraw(rows()); } }),
-      isCfb ? h("select", { onchange: e => { conf = e.target.value; tbl.redraw(rows()); } },
+      college ? h("select", { onchange: e => { conf = e.target.value; tbl.redraw(rows()); } },
                 h("option", { value: "" }, "All conferences"), confs.map(c => h("option", { value: c }, c))) : null),
     h("div", { class: "card tight" }, tbl),
     isCfb ? h("div", { class: "note" }, "Reference model, not a betting signal: in honest backtests it has never beaten a closing spread (test RMSE 15.80 vs market 15.37).") : null,
+    sport === "cbb" ? h("div", { class: "note" }, `Early-season ratings lean on last year: each team starts at ${Math.round(d.shrink * 100)}% of its final 2025-26 rating and moves with every game (${d.gamesPlayed} D1-vs-D1 games so far). It doesn't know about freshmen or transfers, so expect big early disagreements with the books on teams that reloaded. Reference model, not a betting signal.`) : null,
   );
 };
 
@@ -62,7 +63,7 @@ function gameCard(sport, d, g) {
   const pH = g.pHome, pA = 1 - pH;
   const row = (t, p, proj, fav, side) => h("div", { class: "game-row" + (fav ? " fav" : "") },
     h("a", { class: "nm", href: `#/${sport}/team/${t.id}` }, logo(t), h("span", { class: "nm-txt" },
-      h("span", {}, (t.rank && sport === "cfb" && t.rank <= 25 ? `${t.rank} ` : "") + (t.short || t.name)),
+      h("span", {}, (t.rank && isCollege(sport) && t.rank <= 25 ? `${t.rank} ` : "") + (t.short || t.name)),
       sport === "mlb" ? spLine({ ...g, sport }, side) : null)),
     h("span", { class: "proj" }, proj != null ? fmt.n(proj, sport === "nhl" || sport === "mlb" ? 1 : 0) : ""),
     h("span", { class: "pct" }, fmt.pct(p)));
@@ -228,7 +229,7 @@ Views.predictions = async (sport) => {
   const box = h("div", { class: "games" });
   const draw = () => {
     let ps = preds;
-    if (filter === "top" && sport === "cfb") ps = ps.filter(g => (team(d, g.home).rank || 99) <= 25 || (team(d, g.away).rank || 99) <= 25);
+    if (filter === "top" && isCollege(sport)) ps = ps.filter(g => (team(d, g.home).rank || 99) <= 25 || (team(d, g.away).rank || 99) <= 25);
     if (filter === "close") ps = ps.filter(g => Math.abs(g.pHome - 0.5) < 0.12);
     if (filter === "disagree") ps = ps.filter(g => noVigHome(g.mkt) != null)
       .sort((a, b) => Math.abs(b.pHome - noVigHome(b.mkt)) - Math.abs(a.pHome - noVigHome(a.mkt)));
@@ -239,7 +240,7 @@ Views.predictions = async (sport) => {
     h("h1", {}, `${SPORTS[sport].full} Predictions`),
     h("p", { class: "lede" }, sport === "cfb" ? `Week ${d.upcomingWeek} - model spread and win probability for every FBS game.` :
       "Next few days of games - model margin, win probability (normal, σ=" + d.sigma + " " + d.unit + "), and projected score from team scoring rates."),
-    h("div", { class: "toolbar" }, seg([["all", "All games"], ...(sport === "cfb" ? [["top", "Top-25 involved"]] : []), ["close", "Coin flips"], ["disagree", "Model vs book"]],
+    h("div", { class: "toolbar" }, seg([["all", "All games"], ...(isCollege(sport) ? [["top", "Top-25 involved"]] : []), ["close", "Coin flips"], ["disagree", "Model vs book"]],
       filter, v => { filter = v; draw(); })),
     box,
     h("div", { class: "note" }, "\"Model\" numbers are our fair values. The DraftKings line (via ESPN) is what's actually being offered - it is refreshed each build, so check the book before acting, since lines move. None of these models has beaten closing lines in honest backtests, so a big model-vs-book gap is more often model error than value."),
@@ -260,7 +261,8 @@ Views.standings = async (sport) => {
     { k: "diff", label: "Diff/G", num: true, sort: t => (t.pf - t.pa) / Math.max(1, t.gp), fmt: t => h("span", { class: t.pf >= t.pa ? "pos" : "neg" }, fmt.sgn((t.pf - t.pa) / Math.max(1, t.gp))) },
     { k: "home", label: "Home", nosort: true, fmt: t => `${t.homeRec[0]}-${t.homeRec[1]}` },
     { k: "away", label: "Away", nosort: true, fmt: t => `${t.awayRec[0]}-${t.awayRec[1]}` },
-    { k: "standing", label: "Division", asc: true, fmt: t => h("span", { class: "muted small" }, t.standing || "") },
+    sport === "cbb" ? { k: "conf", label: "Conf", asc: true, fmt: t => h("span", { class: "muted small" }, `${t.conf} ${t.confRec[0]}-${t.confRec[1]}`) }
+      : { k: "standing", label: "Division", asc: true, fmt: t => h("span", { class: "muted small" }, t.standing || "") },
     { k: "rank", label: "Power #", num: true, asc: true },
   ].filter(Boolean);
   mount(h("h1", {}, `${SPORTS[sport].full} Standings`),
@@ -307,9 +309,9 @@ Views.rumors = async (sport) => {
 Views.teams = async (sport) => {
   const d = await sportData(sport);
   const groups = {};
-  for (const t of d.teams) (groups[sport === "cfb" ? t.conf || "Other" : (t.standing || "").replace(/^\S+ in /, "") || "League"] ||= []).push(t);
+  for (const t of d.teams) (groups[isCollege(sport) ? t.conf || "Other" : (t.standing || "").replace(/^\S+ in /, "") || "League"] ||= []).push(t);
   mount(h("h1", {}, `${SPORTS[sport].full} Teams`),
-    h("p", { class: "lede" }, "Every team page has a live roster pulled straight from ESPN, the schedule with model predictions, and " + (sport === "cfb" ? "portal + recruiting activity." : "team-tagged trade rumors.")),
+    h("p", { class: "lede" }, "Every team page has a live roster pulled straight from ESPN, the schedule with model predictions" + (sport === "cfb" ? ", and portal + recruiting activity." : sport === "cbb" ? "." : ", and team-tagged trade rumors.")),
     h("div", { class: "grid g3" }, Object.keys(groups).sort().map(g => h("div", { class: "card" }, h("h3", {}, g),
       groups[g].sort((a, b) => (a.rank || 999) - (b.rank || 999)).map(t => h("div", { style: { padding: "4px 0", display: "flex", justifyContent: "space-between" } },
         teamLink(sport, t), h("span", { class: "muted small" }, sport === "cfb" ? t.record : fmt.rec(t))))))));
@@ -330,7 +332,7 @@ async function liveRoster(sport, id) {
 Views.team = async (sport, id) => {
   const d = await sportData(sport);
   const t = team(d, id);
-  const isCfb = sport === "cfb";
+  const isCfb = sport === "cfb", college = isCollege(sport);
   const built = (await teamPlayers(sport, [id]))[id] || [];
   const builtById = Object.fromEntries(built.map(p => [p.id, p]));
   const sched = d.schedule.filter(g => g.home === id || g.away === id);
@@ -344,17 +346,17 @@ Views.team = async (sport, id) => {
       { k: "name", label: "Player", asc: true, fmt: p => h("div", { class: "team-cell" }, p.img ? h("img", { class: "headshot", src: p.img, loading: "lazy", alt: "" }) : h("span", { class: "headshot" }), h("span", {}, h("a", { href: `#/${sport}/player/${id}/${p.id}`, class: "plink" }, p.name), p.qb1 ? h("span", { class: "chip good", style: { marginLeft: "6px" } }, "QB1") : null,
         p.inj ? h(p.injSrc ? "a" : "span", { class: "chip bad", style: { marginLeft: "6px" }, title: p.injNote || p.inj, href: p.injSrc || null, target: p.injSrc ? "_blank" : null }, p.inj) : null)) },
       { k: "pos", label: "Pos", asc: true, sort: p => { const i = posOrder.indexOf(p.pos); return i < 0 ? 99 : i; } },
-      isCfb ? { k: "cls", label: "Class" } : { k: "age", label: "Age", num: true },
+      college ? { k: "cls", label: "Class" } : { k: "age", label: "Age", num: true },
       { k: "ht", label: "Ht" }, { k: "wt", label: "Wt" },
       { k: "line", label: "Season", nosort: true, fmt: p => h("span", { class: "muted small" }, p.line || "") },
-      !isCfb ? { k: "salary", label: "Salary", num: true, fmt: p => p.salary ? h("span", {}, fmt.money(p.salary), p.salEst ? h("span", { class: "muted small" }, " est") : "") : "–" } : null,
-      !isCfb ? { k: "yrs", label: "Yrs", num: true } : null,
-      !isCfb ? { k: "tv", label: "Trade value", num: true, sort: p => p.tv?.now, fmt: p => p.tv ? h("span", { class: "mono" }, fmt.n(p.tv.now, 0)) : "–" } : null,
+      !college ? { k: "salary", label: "Salary", num: true, fmt: p => p.salary ? h("span", {}, fmt.money(p.salary), p.salEst ? h("span", { class: "muted small" }, " est") : "") : "–" } : null,
+      !college ? { k: "yrs", label: "Yrs", num: true } : null,
+      !college ? { k: "tv", label: "Trade value", num: true, sort: p => p.tv?.now, fmt: p => p.tv ? h("span", { class: "mono" }, fmt.n(p.tv.now, 0)) : "–" } : null,
     ].filter(Boolean);
     rosterBox.replaceChildren(
       h("div", { class: "card-head" }, h("h2", {}, `Roster (${rows.length})`),
         h("span", { class: "small muted" }, live ? [h("span", { class: "live-dot" }), "Live from ESPN"] : "Snapshot from last build")),
-      table(cols, rows, { sort: isCfb ? "pos" : "tv", asc: isCfb, maxH: "620px" }));
+      table(cols, rows, { sort: college ? "pos" : "tv", asc: college, maxH: "620px" }));
   };
   liveRoster(sport, id).then(r => drawRoster(r, true)).catch(() => drawRoster(built, false));
 
@@ -378,7 +380,7 @@ Views.team = async (sport, id) => {
 
   const side = [];
   if (isCfb) side.push(...await CFB.teamExtras(d, id));
-  else {
+  else if (sport !== "cbb") {
     const r = await load(`rumors_${sport}`).catch(() => null);
     const items = r ? r.items.filter(x => x.teams.includes(id)).slice(0, 12) : [];
     side.push(h("div", { class: "card tight" }, h("div", { class: "card-head" }, h("h2", {}, "Rumors & news"),
@@ -388,10 +390,10 @@ Views.team = async (sport, id) => {
   const stat = (v, l) => h("div", { class: "stat" }, h("b", {}, v), h("span", {}, l));
   mount(
     h("div", { class: "team-hero", style: { background: `linear-gradient(120deg, ${t.color}, ${t.alt === t.color ? "#111" : shade(t.color)})` } },
-      logo(t, "lg"), h("div", {}, h("h1", {}, t.name), h("div", { style: { opacity: .85 } }, [isCfb ? t.conf : t.standing, t.venue].filter(Boolean).join(" · "))),
+      logo(t, "lg"), h("div", {}, h("h1", {}, t.name), h("div", { style: { opacity: .85 } }, [college ? t.conf : t.standing, t.venue].filter(Boolean).join(" · "))),
       h("div", { class: "stats" }, stat(isCfb ? t.record || "–" : fmt.rec(t), "Record"), stat(`#${t.rank ?? "–"}`, "Power rank"),
         stat(fmt.sgn(t.now ?? t.rating, sport === "nhl" || sport === "mlb" ? 2 : 1), "Rating"),
-        isCfb ? stat(fmt.n(t.projW), "Proj. wins") : stat(fmt.money(t.payroll), "Payroll"))),
+        isCfb ? stat(fmt.n(t.projW), "Proj. wins") : sport === "cbb" ? stat(`${t.confRec[0]}-${t.confRec[1]}`, `${t.conf} record`) : stat(fmt.money(t.payroll), "Payroll"))),
     t.injAdj ? h("div", { class: "note warn" }, `Injury / QB adjustment: ${fmt.sgn(t.injAdj)} pts - ${t.injNotes.join("; ")}`,
       t.now != null ? ` Rating and rank use the current lineup; at full strength ${t.short} would be ${fmt.sgn(t.rating)} (#${t.fullRank}).` : "") : null,
     h("div", { class: "grid", style: { gridTemplateColumns: "minmax(0,1.6fr) minmax(0,1fr)" }, id: "teamGrid" },

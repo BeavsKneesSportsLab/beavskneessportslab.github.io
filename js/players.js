@@ -38,7 +38,7 @@ Players.page = async (sport, args) => {
   const d = await sportData(sport);
   const [p, tid] = await findPlayer(sport, tidArg, pid);
   if (!p) return mount(h("div", { class: "card empty" }, "Player not found in the current rosters."));
-  const t = team(d, tid), isPro = sport !== "cfb";
+  const t = team(d, tid), isPro = !isCollege(sport);
   const kv = (label, val) => val == null || val === "" ? null : h("div", { class: "kpi" }, h("span", {}, label), h("b", {}, val));
   // football: real per-game averages from season totals (p.sim can hold the sim's starter-volume projection)
   const per = p.tot && p.gp ? Object.entries(p.tot).filter(([k, v]) => v && STAT_LABELS[k]).map(([k, v]) => [k, v / p.gp])
@@ -104,8 +104,8 @@ Players.compare = async (sport, args) => {
     h("div", { class: "card" }, h("div", { class: "cmp-heads" }, head(a, ta), h("span", { class: "vs" }, "vs"), head(b, tb)),
       h("table", { class: "t cmp" }, h("tbody", {},
         row("Age", a.age, b.age, "low", 0),
-        sport !== "cfb" ? row("Salary", a.salary ? fmt.money(a.salary) : "–", b.salary ? fmt.money(b.salary) : "–") : null,
-        sport !== "cfb" && a.tv && b.tv ? row("Trade value", a.tv.now, b.tv.now, "high", 0) : null,
+        !isCollege(sport) ? row("Salary", a.salary ? fmt.money(a.salary) : "–", b.salary ? fmt.money(b.salary) : "–") : null,
+        !isCollege(sport) && a.tv && b.tv ? row("Trade value", a.tv.now, b.tv.now, "high", 0) : null,
         row("Games", a.gp, b.gp, "high", 0),
         keys.map(k => row(`${STAT_LABELS[k]} / g`, (a.sim || {})[k] ?? 0, (b.sim || {})[k] ?? 0, k === "int" ? "high" : "high"))))),
     h("p", { class: "muted small" }, "Green marks the better number. Per-game figures are season averages (football: per game played)."));

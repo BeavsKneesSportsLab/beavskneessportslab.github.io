@@ -164,7 +164,7 @@ Views.home = async () => {
   mount(
     h("div", { class: "home-head" }, h("img", { class: "home-logo", src: "img/beaver-full.jpg", alt: "" }),
       h("div", {}, h("h1", {}, "Beavs Knees Sports Lab"), h("div", { class: "muted" }, today)),
-      h("div", { class: "home-links" }, HOME_SPORTS.map(k => h("a", { class: "chip", href: `#/${k}/${k === "cfb" ? "ratings" : "predictions"}` }, SPORTS[k].name)))),
+      h("div", { class: "home-links" }, ["cfb", "cbb", ...HOME_SPORTS.slice(1)].map(k => h("a", { class: "chip", href: `#/${k}/${k === "cfb" ? "ratings" : "predictions"}` }, SPORTS[k].name)))),
     h("section", {}, h("div", { class: "card-head" }, h("h2", {}, "Today's biggest games"),
       h("span", { class: "muted small" }, h("span", { class: "live-dot" }), "Live scores update every minute")), gamesBox),
     picksCard,

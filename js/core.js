@@ -3,6 +3,9 @@ const SPORTS = {
   cfb: { name: "CFB", full: "College Football", path: "football/college-football", featured: true,
          tabs: [["poll", "Beavs Knees Poll"], ["ratings", "Power Ratings"], ["predictions", "Predictions"], ["playoff", "Playoff Odds"], ["heisman", "Heisman"], ["disappoint", "Most Disappointing"],
                 ["recruiting", "Recruiting"], ["portal", "Transfer Portal"], ["record", "Model vs Market"], ["sim", "Game Sim"], ["teams", "Teams"], ["board", "Message Board"]] },
+  cbb: { name: "CBB", full: "College Basketball", path: "basketball/mens-college-basketball",
+         tabs: [["ratings", "Power Ratings"], ["predictions", "Predictions"], ["record", "Model vs Market"], ["standings", "Standings"],
+                ["sim", "Game Sim"], ["teams", "Teams"], ["board", "Message Board"]] },
   nfl: { name: "NFL", full: "NFL", path: "football/nfl" },
   nba: { name: "NBA", full: "NBA", path: "basketball/nba" },
   mlb: { name: "MLB", full: "MLB", path: "baseball/mlb" },
@@ -12,6 +15,8 @@ const PRO_TABS = [["ratings", "Power Ratings"], ["predictions", "Predictions"], 
                   ["rumors", "Trade Rumors"], ["trade", "Trade Simulator"], ["sim", "Game Sim"], ["teams", "Teams"], ["board", "Message Board"]];
 for (const k of ["nfl", "nba", "mlb", "nhl"]) SPORTS[k].tabs = k === "mlb"
   ? PRO_TABS.map(([t, l]) => t === "projections" ? ["hotstove", "Hot Stove"] : [t, l]) : PRO_TABS;
+
+const isCollege = sport => sport === "cfb" || sport === "cbb";
 
 const _cache = {};
 function load(name) {
