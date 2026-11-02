@@ -78,7 +78,7 @@ function featuredCard(g, live, big, why) {
   const modelTxt = m < (goals ? 0.03 : 0.25) ? "Pick'em" : goals ? `${fav.abbr} ${fmt.pct(Math.max(pH, 1 - pH))}` : `${fav.abbr} -${(Math.round(m * 2) / 2).toFixed(1)}`;
   const row = (t, score, p, side) => h("div", { class: "fg-row" },
     h("a", { class: "nm", href: `#/${g.sport}/team/${t.id}` }, logo(t, big ? "md" : ""),
-      h("span", { class: "nm-txt" }, h("span", {}, isCollege(g.sport) && t.rank && t.rank <= 25 ? h("span", { class: "rank" }, t.rank) : null, t.short || t.name),
+      h("span", { class: "nm-txt" }, h("span", {}, isCollege(g.sport) && t.ap ? h("span", { class: "rank", title: "AP poll rank" }, t.ap) : null, t.short || t.name),
         spLine(g, side)),
       h("span", { class: "muted small" }, g.sport === "cfb" ? t.record || "" : t.w != null ? fmt.rec(t) : "")),
     state === "pre" ? h("span", { class: "pct" }, fmt.pct(p)) : h("b", { class: "score" }, score ?? "–"));

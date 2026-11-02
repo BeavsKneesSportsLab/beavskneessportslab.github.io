@@ -63,7 +63,7 @@ function gameCard(sport, d, g) {
   const pH = g.pHome, pA = 1 - pH;
   const row = (t, p, proj, fav, side) => h("div", { class: "game-row" + (fav ? " fav" : "") },
     h("a", { class: "nm", href: `#/${sport}/team/${t.id}` }, logo(t), h("span", { class: "nm-txt" },
-      h("span", {}, (t.rank && isCollege(sport) && t.rank <= 25 ? `${t.rank} ` : "") + (t.short || t.name)),
+      h("span", {}, (isCollege(sport) && t.ap ? `${t.ap} ` : "") + (t.short || t.name)),
       sport === "mlb" ? spLine({ ...g, sport }, side) : null)),
     h("span", { class: "proj" }, proj != null ? fmt.n(proj, sport === "nhl" || sport === "mlb" ? 1 : 0) : ""),
     h("span", { class: "pct" }, fmt.pct(p)));
@@ -229,7 +229,7 @@ Views.predictions = async (sport) => {
   const box = h("div", { class: "games" });
   const draw = () => {
     let ps = preds;
-    if (filter === "top" && isCollege(sport)) ps = ps.filter(g => (team(d, g.home).rank || 99) <= 25 || (team(d, g.away).rank || 99) <= 25);
+    if (filter === "top" && isCollege(sport)) ps = ps.filter(g => team(d, g.home).ap || team(d, g.away).ap);
     if (filter === "close") ps = ps.filter(g => Math.abs(g.pHome - 0.5) < 0.12);
     if (filter === "disagree") ps = ps.filter(g => noVigHome(g.mkt) != null)
       .sort((a, b) => Math.abs(b.pHome - noVigHome(b.mkt)) - Math.abs(a.pHome - noVigHome(a.mkt)));
@@ -240,7 +240,7 @@ Views.predictions = async (sport) => {
     h("h1", {}, `${SPORTS[sport].full} Predictions`),
     h("p", { class: "lede" }, sport === "cfb" ? `Week ${d.upcomingWeek} - model spread and win probability for every FBS game.` :
       "Next few days of games - model margin, win probability (normal, σ=" + d.sigma + " " + d.unit + "), and projected score from team scoring rates."),
-    h("div", { class: "toolbar" }, seg([["all", "All games"], ...(isCollege(sport) ? [["top", "Top-25 involved"]] : []), ["close", "Coin flips"], ["disagree", "Model vs book"]],
+    h("div", { class: "toolbar" }, seg([["all", "All games"], ...(isCollege(sport) ? [["top", "AP Top 25 involved"]] : []), ["close", "Coin flips"], ["disagree", "Model vs book"]],
       filter, v => { filter = v; draw(); })),
     box,
     h("div", { class: "note" }, "\"Model\" numbers are our fair values. The DraftKings line (via ESPN) is what's actually being offered - it is refreshed each build, so check the book before acting, since lines move. None of these models has beaten closing lines in honest backtests, so a big model-vs-book gap is more often model error than value."),
@@ -391,7 +391,7 @@ Views.team = async (sport, id) => {
   mount(
     h("div", { class: "team-hero", style: { background: `linear-gradient(120deg, ${t.color}, ${t.alt === t.color ? "#111" : shade(t.color)})` } },
       logo(t, "lg"), h("div", {}, h("h1", {}, t.name), h("div", { style: { opacity: .85 } }, [college ? t.conf : t.standing, t.venue].filter(Boolean).join(" · "))),
-      h("div", { class: "stats" }, stat(isCfb ? t.record || "–" : fmt.rec(t), "Record"), stat(`#${t.rank ?? "–"}`, "Power rank"),
+      h("div", { class: "stats" }, stat(isCfb ? t.record || "–" : fmt.rec(t), "Record"), stat(`#${t.rank ?? "–"}`, "Power rank"), college ? stat(t.ap ? `#${t.ap}` : "NR", "AP poll") : null,
         stat(fmt.sgn(t.now ?? t.rating, sport === "nhl" || sport === "mlb" ? 2 : 1), "Rating"),
         isCfb ? stat(fmt.n(t.projW), "Proj. wins") : sport === "cbb" ? stat(`${t.confRec[0]}-${t.confRec[1]}`, `${t.conf} record`) : stat(fmt.money(t.payroll), "Payroll"))),
     t.injAdj ? h("div", { class: "note warn" }, `Injury / QB adjustment: ${fmt.sgn(t.injAdj)} pts - ${t.injNotes.join("; ")}`,
