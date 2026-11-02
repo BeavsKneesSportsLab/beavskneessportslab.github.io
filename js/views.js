@@ -8,19 +8,22 @@ Views.ratings = async (sport) => {
   const rows = () => d.teams.filter(t => t.rating != null)
     .filter(t => !conf || t.conf === conf || t.group === conf)
     .filter(t => !q || t.name.toLowerCase().includes(q));
-  const maxR = Math.max(...d.teams.map(t => Math.abs(t.rating || 0)));
+  const R = t => t.now ?? t.rating;          // CFB: rating with the current lineup (injuries / QB changes)
+  const maxR = Math.max(...d.teams.map(t => Math.abs(R(t) || 0)));
   const cols = [
     { k: "rank", label: "#", num: true, asc: true, fmt: t => h("span", { class: "rank" }, t.rank ?? "–") },
     { k: "name", label: "Team", asc: true, fmt: t => teamLink(sport, t) },
     isCfb ? { k: "conf", label: "Conf", asc: true } : null,
     { k: "w", label: "Record", sort: t => isCfb ? parseInt(t.record) : t.w / Math.max(1, t.gp), fmt: t => isCfb ? t.record || "–" : fmt.rec(t) },
-    { k: "rating", label: `Rating (${d.unit})`, num: true, title: "Neutral-site margin vs an average team",
-      fmt: t => h("span", { class: "mono" }, fmt.sgn(t.rating, sport === "nhl" || sport === "mlb" ? 2 : 1)) },
+    { k: "rating", label: `Rating (${d.unit})`, num: true, sort: R,
+      title: isCfb ? "Neutral-site margin vs an average team, with the current lineup (full strength + Inj adj)" : "Neutral-site margin vs an average team",
+      fmt: t => h("span", { class: "mono", title: t.now != null && t.injAdj ? `Full strength ${fmt.sgn(t.rating)} (#${t.fullRank})` : null },
+        fmt.sgn(R(t), sport === "nhl" || sport === "mlb" ? 2 : 1)) },
     { k: "injAdj", label: "Inj adj", num: true, asc: true, title: "Points added/subtracted in predictions for injuries and QB changes (hover for detail)",
       fmt: t => t.injAdj ? h("span", { class: t.injAdj < 0 ? "neg" : "pos", title: (t.injNotes || []).join("\n"), style: { cursor: "help" } }, fmt.sgn(t.injAdj)) : h("span", { class: "muted" }, "–") },
     { k: "bar", label: "", nosort: true, fmt: t => h("div", { class: "diverge" }, h("i", { style: {
-        left: t.rating >= 0 ? "50%" : `${50 - 50 * Math.abs(t.rating) / maxR}%`,
-        width: `${50 * Math.abs(t.rating) / maxR}%`, background: t.rating >= 0 ? "var(--good)" : "var(--bad)" } })) },
+        left: R(t) >= 0 ? "50%" : `${50 - 50 * Math.abs(R(t)) / maxR}%`,
+        width: `${50 * Math.abs(R(t)) / maxR}%`, background: R(t) >= 0 ? "var(--good)" : "var(--bad)" } })) },
     isCfb ? { k: "resultsOnly", label: "Results-only", num: true, title: "Fit on 2026 games alone - no preseason prior",
               fmt: t => t.resultsOnly == null ? "–" : `${fmt.sgn(t.resultsOnly)} (#${t.resultsRank})` } : null,
     isCfb ? { k: "preseason", label: "Preseason", num: true, fmt: t => fmt.sgn(t.preseason) } : null,
@@ -387,9 +390,10 @@ Views.team = async (sport, id) => {
     h("div", { class: "team-hero", style: { background: `linear-gradient(120deg, ${t.color}, ${t.alt === t.color ? "#111" : shade(t.color)})` } },
       logo(t, "lg"), h("div", {}, h("h1", {}, t.name), h("div", { style: { opacity: .85 } }, [isCfb ? t.conf : t.standing, t.venue].filter(Boolean).join(" · "))),
       h("div", { class: "stats" }, stat(isCfb ? t.record || "–" : fmt.rec(t), "Record"), stat(`#${t.rank ?? "–"}`, "Power rank"),
-        stat(fmt.sgn(t.rating, sport === "nhl" || sport === "mlb" ? 2 : 1), "Rating"),
+        stat(fmt.sgn(t.now ?? t.rating, sport === "nhl" || sport === "mlb" ? 2 : 1), "Rating"),
         isCfb ? stat(fmt.n(t.projW), "Proj. wins") : stat(fmt.money(t.payroll), "Payroll"))),
-    t.injAdj ? h("div", { class: "note warn" }, `Injury / QB adjustment in predictions: ${fmt.sgn(t.injAdj)} pts - ${t.injNotes.join("; ")}`) : null,
+    t.injAdj ? h("div", { class: "note warn" }, `Injury / QB adjustment: ${fmt.sgn(t.injAdj)} pts - ${t.injNotes.join("; ")}`,
+      t.now != null ? ` Rating and rank use the current lineup; at full strength ${t.short} would be ${fmt.sgn(t.rating)} (#${t.fullRank}).` : "") : null,
     h("div", { class: "grid", style: { gridTemplateColumns: "minmax(0,1.6fr) minmax(0,1fr)" }, id: "teamGrid" },
       h("div", { class: "grid" }, h("div", { class: "card" }, rosterBox)),
       h("div", { class: "grid", style: { alignContent: "start" } }, h("div", { class: "card tight" }, h("h2", {}, "Schedule"), schedTbl), ...side)));

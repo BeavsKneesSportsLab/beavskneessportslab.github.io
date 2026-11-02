@@ -182,8 +182,8 @@ Views.home = async () => {
     cfb ? h("div", { class: "grid g4 home-lists", style: { marginTop: "16px" } },
       poll ? listCard(`🦫 Beavs Knees Poll · Wk ${poll.weeks.at(-1).week}`, "#/cfb/poll", "Full poll →", poll.weeks.at(-1).top25.slice(0, 10).filter(r => r.id).map(r => {
         const t = team(cfb, r.id); return h("div", { class: "mini-row" }, h("span", { class: "team-cell" }, h("span", { class: "rank" }, r.rank), logo(t), h("a", { href: `#/cfb/team/${t.id}` }, t.short)), moveChip(r)); })) : null,
-      listCard("Model Top 10", "#/cfb/ratings", "All →", top.map(x => rankRow(x, x.rating))),
-      listCard("CFB Bottom 10", "#/cfb/ratings", "All →", bottom.map(x => rankRow(x, x.rating))),
+      listCard("Model Top 10", "#/cfb/ratings", "All →", top.map(x => rankRow(x, x.now ?? x.rating))),
+      listCard("CFB Bottom 10", "#/cfb/ratings", "All →", bottom.map(x => rankRow(x, x.now ?? x.rating))),
       listCard("😬 Most disappointing", "#/cfb/disappoint", "Board →", cfb.disappoint.slice(0, 10).map(x => expRow(team(cfb, x.id), x))),
       listCard("🚀 Biggest overachievers", "#/cfb/disappoint", "Board →", cfb.disappoint.slice(-10).reverse().map(x => expRow(team(cfb, x.id), x)))) : null,
     s && s.n ? h("a", { class: "card mvm-strip", href: "#/cfb/record" },
