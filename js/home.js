@@ -1,6 +1,6 @@
 /* home.js — front page: today's biggest games (live scores from ESPN), top stories (live ESPN headlines),
    discussion of the day (data-driven question + its own Giscus thread), and quick-hit panels. */
-const HOME_SPORTS = ["cfb", "nfl", "nba", "mlb", "nhl"];
+const HOME_SPORTS = ["cfb", "cbb", "nfl", "nba", "mlb", "nhl"];
 let _homeTimer = null;
 
 async function liveScores(games) {
@@ -9,7 +9,7 @@ async function liveScores(games) {
   const out = {};
   await Promise.all(keys.map(async k => {
     const [sp, day] = k.split("|");
-    const extra = sp === "cfb" ? "&groups=80&limit=300" : "";
+    const extra = sp === "cfb" ? "&groups=80&limit=300" : sp === "cbb" ? "&groups=50&limit=500" : "";
     try {
       const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${SPORTS[sp].path}/scoreboard?dates=${day}${extra}`);
       const j = await r.json();
@@ -38,7 +38,7 @@ async function liveStories(fallback) {
    yesterday's - so re-pick today's games from each sport's predictions (several days deep), with the
    same scoring as build/home.py featured_games. ptDay comes from pickem.js (called after every script loads). */
 const NATIONAL = new Set(["ESPN", "ABC", "FOX", "Fox", "CBS", "NBC", "TNT", "Prime Video", "FS1", "ESPN2", "Peacock", "TBS", "NFL Net", "truTV", "ESPNU", "CBSSN", "NBA TV"]);
-const SPORT_W = { cfb: 1.15, nfl: 1.1, nba: 1.0, nhl: 0.95, mlb: 1.05 };
+const SPORT_W = { cfb: 1.15, nfl: 1.1, nba: 1.0, nhl: 0.95, mlb: 1.05, cbb: 1.0 };
 async function freshGames(home) {
   const today = ptDay(Date.now());
   if (home.date === today) return home.games;
@@ -78,7 +78,7 @@ function featuredCard(g, live, big, why) {
   const modelTxt = m < (goals ? 0.03 : 0.25) ? "Pick'em" : goals ? `${fav.abbr} ${fmt.pct(Math.max(pH, 1 - pH))}` : `${fav.abbr} -${(Math.round(m * 2) / 2).toFixed(1)}`;
   const row = (t, score, p, side) => h("div", { class: "fg-row" },
     h("a", { class: "nm", href: `#/${g.sport}/team/${t.id}` }, logo(t, big ? "md" : ""),
-      h("span", { class: "nm-txt" }, h("span", {}, g.sport === "cfb" && t.rank && t.rank <= 25 ? h("span", { class: "rank" }, t.rank) : null, t.short || t.name),
+      h("span", { class: "nm-txt" }, h("span", {}, isCollege(g.sport) && t.rank && t.rank <= 25 ? h("span", { class: "rank" }, t.rank) : null, t.short || t.name),
         spLine(g, side)),
       h("span", { class: "muted small" }, g.sport === "cfb" ? t.record || "" : t.w != null ? fmt.rec(t) : "")),
     state === "pre" ? h("span", { class: "pct" }, fmt.pct(p)) : h("b", { class: "score" }, score ?? "–"));
@@ -164,7 +164,7 @@ Views.home = async () => {
   mount(
     h("div", { class: "home-head" }, h("img", { class: "home-logo", src: "img/beaver-full.jpg", alt: "" }),
       h("div", {}, h("h1", {}, "Beavs Knees Sports Lab"), h("div", { class: "muted" }, today)),
-      h("div", { class: "home-links" }, ["cfb", "cbb", ...HOME_SPORTS.slice(1)].map(k => h("a", { class: "chip", href: `#/${k}/${k === "cfb" ? "ratings" : "predictions"}` }, SPORTS[k].name)))),
+      h("div", { class: "home-links" }, HOME_SPORTS.map(k => h("a", { class: "chip", href: `#/${k}/${k === "cfb" ? "ratings" : "predictions"}` }, SPORTS[k].name)))),
     h("section", {}, h("div", { class: "card-head" }, h("h2", {}, "Today's biggest games"),
       h("span", { class: "muted small" }, h("span", { class: "live-dot" }), "Live scores update every minute")), gamesBox),
     picksCard,

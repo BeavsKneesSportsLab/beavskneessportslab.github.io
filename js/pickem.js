@@ -1,13 +1,14 @@
 /* pickem.js — pick'em for every sport: weekly CFB (10 biggest games + the Beavs) and NFL, daily NBA,
-   NHL and MLB. Spread sports (CFB/NFL/NBA) are picked against the DraftKings spread; NHL/MLB are picked
+   NHL and MLB, daily college hoops (12 biggest games + the Beavs). Spread sports (CFB/NFL/NBA) are picked against the DraftKings spread; NHL/MLB are picked
    straight up at the DraftKings moneyline. Scored in units so sports compare fairly: spread +1 cover /
    -1 miss / 0 push; moneyline pays the odds picked at (+150 -> +1.5, -150 -> +0.67), a miss is -1.
    Accounts and picks live in Supabase (email magic link). Grading happens here from the site's final
    scores; a pick the server stamped after kickoff is void. "Beavs Model" plays too. */
 const SUPA = { url: "https://uamgliqqkdgbozqyufvj.supabase.co", key: "sb_publishable_kBQ7ZvABLuoiuwDKuXcStQ_ndwXqGex" };
 const Pickem = {};
-const PK_SPORTS = ["cfb", "nfl", "nba", "nhl", "mlb"];
-const DAILY = new Set(["nba", "nhl", "mlb"]);
+const PK_SPORTS = ["cfb", "cbb", "nfl", "nba", "nhl", "mlb"];
+const DAILY = new Set(["cbb", "nba", "nhl", "mlb"]);
+const CBB_PER_DAY = 12;                                  // 30-150 college hoops games a night: the biggest 12 + the Beavs
 const ML_SPORTS = new Set(["nhl", "mlb"]);
 let _sb = null;
 
@@ -43,6 +44,13 @@ function slates(sport, d) {
     (ML_SPORTS.has(sport) ? g.mkt.mlH != null && g.mkt.mlA != null : g.mkt.spread != null);
   let games = d.predictions.filter(ok);
   if (!games.length) return [];
+  if (sport === "cbb") {
+    const rk = g => Math.min(T[g.home].rank || 400, T[g.away].rank || 400) + 0.35 * Math.max(T[g.home].rank || 400, T[g.away].rank || 400);
+    const byDay = {};
+    for (const g of games) (byDay[ptDay(g.date)] ||= []).push(g);
+    games = Object.values(byDay).flatMap(gs => [...new Set([...gs.filter(g => [T[g.home].abbr, T[g.away].abbr].includes("ORST")),
+                                                             ...gs.sort((a, b) => rk(a) - rk(b)).slice(0, CBB_PER_DAY)])]);
+  }
   if (DAILY.has(sport)) {
     const days = [...new Set(games.map(g => ptDay(g.date)))].sort();
     return days.map(day => ({ key: day, label: new Date(day + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }),
@@ -110,7 +118,9 @@ Pickem.view = async () => {
       const modelSide = isML ? (bookP != null && g.pHome > bookP ? g.home : g.away) : (g.margin + m.spread > 0 ? g.home : g.away);
       const save = async (t, line) => {
         const { error } = await c.from("picks").upsert({ game_id: g.id, sport, week: s.key, pick: t.id, line }, { onConflict: "user_id,game_id" });
-        if (error) alert("Couldn't save that pick: " + error.message); else drawSlate();
+        if (error) alert(/picks_sport_check/.test(error.message) ? `${SPORTS[sport].name} pick'em isn't switched on in the database yet - check back soon.`
+                                                                 : "Couldn't save that pick: " + error.message);
+        else drawSlate();
       };
       const btn = (t, shown, line) => h("button", { class: "pk-btn" + (p?.pick === t.id ? " on" : ""), disabled: locked || !user || !profile, onclick: () => save(t, line) },
         logo(t), h("span", {}, t.short || t.name), h("b", {}, shown));
@@ -227,7 +237,7 @@ Pickem.view = async () => {
     v => { sport = v; slateKey = S[v][0]?.key; draw(); }) : "");
   mount(
     h("div", { class: "card-head" }, h("div", {}, h("h1", {}, "Pick'em"), h("p", { class: "lede", style: { margin: 0 } },
-      "Weekly CFB (the 10 biggest games + the Beavs) and NFL against the spread; daily NBA against the spread; daily NHL and MLB straight up at the moneyline. Scored in units: +1 per cover, -1 per miss; moneyline wins pay the odds (+150 = +1.5). Picks lock at kickoff. Can you beat the model?")),
+      "Weekly CFB (the 10 biggest games + the Beavs) and NFL against the spread; daily college hoops (the 12 biggest games + the Beavs) and NBA against the spread; daily NHL and MLB straight up at the moneyline. Scored in units: +1 per cover, -1 per miss; moneyline wins pay the odds (+150 = +1.5). Picks lock at kickoff. Can you beat the model?")),
       user ? h("div", { class: "small muted", style: { textAlign: "right" } }, profile ? h("b", {}, profile.display_name) : user.email, h("br"),
         h("a", { class: "link", href: "javascript:void 0", onclick: async () => { await c.auth.signOut(); Pickem.view(); } }, "Sign out")) : null),
     !user ? signIn() : !profile ? nameSetup() : null,
