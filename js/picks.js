@@ -22,7 +22,6 @@ const PICK_WEEKS = {
     { game: "401858281", team: "59", line: 8.5, units: 2,
       text: "Pitt has dropped three in a row, including a 29-point loss to Miami last week. The public is fading the Yellow Jackets heavily in a season I'm sure they'd like to forget, but I have confidence that Alberto Mendoza, the younger brother of Heisman winner Fernando Mendoza, can get it done on the road." },
   ] },
-  10: { sport: "cfb", picks: [] },
 };
 
 const Picks = {
