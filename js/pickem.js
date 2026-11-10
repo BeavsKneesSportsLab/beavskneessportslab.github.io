@@ -186,21 +186,8 @@ Pickem.view = async () => {
       { k: "pct", label: "Win %", num: true, fmt: r => fmt.pct(r.pct, 1) },
       { k: "u", label: "Units", num: true, fmt: r => h("b", { class: r.u >= 0 ? "pos" : "neg" }, fmt.sgn(r.u, 2)) },
     ];
-    // Parker's Picks of the Week on the same flat scale (+1 cover / -1 miss), CFB only
-    const cfbWeek = wk => `${D.cfb.season || 2026}-w${wk}`;
-    const parkerRow = weekKey => {
-      const a = { w: 0, l: 0, p: 0, u: 0 };
-      for (const wk of Object.keys(PICK_WEEKS)) {
-        if (weekKey && cfbWeek(wk) !== weekKey) continue;
-        for (const r of Picks.grade(D.cfb, PICK_WEEKS[wk]).results) {
-          if (r.res === "W") { a.w++; a.u += 1; } else if (r.res === "L") { a.l++; a.u -= 1; } else a.p++;
-        }
-      }
-      return a.w + a.l + a.p ? { who: "🎯 Parker's Picks", ...a, pct: a.w / Math.max(1, a.w + a.l), bot: true } : null;
-    };
     const withModel = (rows, f, sp, wk) => {
       const m = modelRow(f); if (m) rows.push(m);
-      if (!sp || sp === "cfb") { const pr = parkerRow(wk); if (pr) rows.push(pr); }
       return rows; };
     // latest finished slate per sport -> its winner
     const champs = () => PK_SPORTS.map(sp => {
