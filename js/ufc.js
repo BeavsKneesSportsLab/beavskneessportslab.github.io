@@ -178,7 +178,7 @@ UFC.elo = async () => {
   const redraw = () => tbl.redraw(ranked());
   mount(
     h("h1", {}, "Fighter Ratings (Elo)"),
-    h("p", { class: "lede" }, `An Elo rating built from every UFC fight since 2010 (${d.model.fights.toLocaleString()} fights). Everyone starts at 1500; beat a higher-rated fighter and you take more of his points. New fighters move faster for their first few bouts, and long layoffs drift a rating back toward 1500. It only knows wins and losses, so treat it as a strength-of-schedule-aware résumé, not a betting model.`),
+    h("p", { class: "lede" }, `An Elo rating built from every UFC fight since 2010 (${d.model.fights.toLocaleString()} fights). Debuts are seeded from the fighter's pre-UFC pro record (a 14-0 prospect starts well above a 6-4 one); after that, beat a higher-rated fighter and you take more of his points, and long layoffs drift a rating back toward 1500. Fight predictions also knock 20 points per year off anyone past 30 (the rating shown here is age-free). It doesn't see styles, injuries or camps, so treat it as a strength-of-schedule-aware résumé, not a betting model.`),
     h("div", { class: "toolbar" },
       h("input", { class: "in", placeholder: "Fighter…", oninput: e => { q = e.target.value.toLowerCase(); redraw(); } }),
       h("select", { class: "in", onchange: e => { div = e.target.value; redraw(); } }, h("option", { value: "" }, "All divisions"), divs.map(x => h("option", { value: x }, x))),
@@ -209,7 +209,7 @@ UFC.market = async () => {
         kpi("Elo picks winner", fmt.pct(acc("pA"))), kpi("Book favorite wins", fmt.pct(acc("book"))),
         kpi("Elo vs book disagreements", `${disW}-${dis.length - disW}`), kpi("1u on Elo's side there", fmt.sgn(units(dis), 1) + "u", units(dis) >= 0 ? "pos" : "neg")),
       h("p", { class: "muted small", style: { marginTop: "12px" } },
-        `Honest read: the book is far sharper than a wins-and-losses Elo. Over ${m.testN.toLocaleString()} fights since ${m.testFrom.slice(0, 4)} (walk-forward, no peeking), Elo's log loss is ${m.testLogLoss} vs ${m.coinLogLoss} for a coin flip and it picks ${fmt.pct(m.testAcc)} of winners. `,
+        `Honest read: the book is far sharper than a wins-and-losses Elo. Over ${m.testN.toLocaleString()} fights since ${m.testFrom.slice(0, 4)} (walk-forward, no peeking), Elo's log loss is ${m.testLogLoss} vs ${m.coinLogLoss} for a coin flip and it picks ${fmt.pct(m.testAcc)} of winners (it accounts for age and pre-UFC record, but not styles, injuries or camp news). `,
         "Use it to read résumés and spot who's being overrated, not as a betting edge.")),
     h("div", { class: "card tight", style: { marginTop: "16px" } }, h("h2", {}, "Every graded fight"),
       table([
