@@ -257,27 +257,69 @@ Views.predictions = async (sport) => {
   );
 };
 
+/* league alignment (ESPN's standing text mixes divisions and conferences, so it's spelled out here) */
+const ALIGN = {
+  nfl: { AFC: { "AFC East": "BUF MIA NE NYJ", "AFC North": "BAL CIN CLE PIT", "AFC South": "HOU IND JAX TEN", "AFC West": "DEN KC LV LAC" },
+         NFC: { "NFC East": "DAL NYG PHI WSH", "NFC North": "CHI DET GB MIN", "NFC South": "ATL CAR NO TB", "NFC West": "ARI LAR SF SEA" } },
+  nba: { "Eastern Conference": { Atlantic: "BOS BKN NY PHI TOR", Central: "CHI CLE DET IND MIL", Southeast: "ATL CHA MIA ORL WSH" },
+         "Western Conference": { Northwest: "DEN MIN OKC POR UTAH", Pacific: "GS LAC LAL PHX SAC", Southwest: "DAL HOU MEM NO SA" } },
+  nhl: { "Eastern Conference": { Atlantic: "BOS BUF DET FLA MTL OTT TB TOR", Metropolitan: "CAR CBJ NJ NYI NYR PHI PIT WSH" },
+         "Western Conference": { Central: "CHI COL DAL MIN NSH STL UTAH WPG", Pacific: "ANA CGY EDM LA SEA SJ VAN VGK" } },
+  mlb: { "American League": { "AL East": "BAL BOS NYY TB TOR", "AL Central": "CHW CLE DET KC MIN", "AL West": "ATH HOU LAA SEA TEX" },
+         "National League": { "NL East": "ATL MIA NYM PHI WSH", "NL Central": "CHC CIN MIL PIT STL", "NL West": "ARI COL LAD SD SF" } },
+};
+function alignOf(sport, t) {
+  if (sport === "cbb") return { conf: t.conf || "Independent", div: null };
+  for (const [conf, divs] of Object.entries(ALIGN[sport] || {}))
+    for (const [div, teams] of Object.entries(divs)) if (teams.split(" ").includes(t.abbr)) return { conf, div };
+  return { conf: "Other", div: null };
+}
+let _standView = "conf";
 Views.standings = async (sport) => {
   const d = await sportData(sport);
-  const rows = d.teams.slice();
-  const cols = [
+  const college = sport === "cbb", nhl = sport === "nhl";
+  const rows = d.teams.map(t => ({ ...t, ...alignOf(sport, t) }));
+  const pct = t => college ? (t.confRec[0] + t.confRec[1] ? t.confRec[0] / (t.confRec[0] + t.confRec[1]) : -1) + t.w / Math.max(1, t.gp) / 1000
+                           : nhl ? 2 * t.w + t.otl + t.w / 1000 : t.w / Math.max(1, t.gp);
+  const cols = view => [
+    { k: "pos", label: "#", num: true, nosort: true, fmt: (t, i) => i + 1 },
     { k: "name", label: "Team", asc: true, fmt: t => teamLink(sport, t) },
     { k: "w", label: "W", num: true }, { k: "l", label: "L", num: true },
-    sport === "nhl" ? { k: "otl", label: "OTL", num: true } : null,
-    sport === "nhl" ? { k: "pts", label: "PTS", num: true, sort: t => 2 * t.w + t.otl, fmt: t => 2 * t.w + t.otl } : null,
-    { k: "pct", label: "Win %", num: true, sort: t => t.w / Math.max(1, t.gp), fmt: t => fmt.n(t.w / Math.max(1, t.gp), 3) },
+    nhl ? { k: "otl", label: "OTL", num: true } : null,
+    nhl ? { k: "pts", label: "PTS", num: true, sort: pct, fmt: t => 2 * t.w + t.otl } : null,
+    college ? { k: "crec", label: "Conf", num: true, sort: pct, fmt: t => `${t.confRec[0]}-${t.confRec[1]}` } : null,
+    { k: "pct", label: "Win %", num: true, sort: college || nhl ? t => t.w / Math.max(1, t.gp) : pct, fmt: t => fmt.n(t.w / Math.max(1, t.gp), 3) },
     { k: "pf", label: "PF/G", num: true, sort: t => t.pf / Math.max(1, t.gp), fmt: t => fmt.n(t.pf / Math.max(1, t.gp)) },
     { k: "pa", label: "PA/G", num: true, sort: t => t.pa / Math.max(1, t.gp), fmt: t => fmt.n(t.pa / Math.max(1, t.gp)) },
     { k: "diff", label: "Diff/G", num: true, sort: t => (t.pf - t.pa) / Math.max(1, t.gp), fmt: t => h("span", { class: t.pf >= t.pa ? "pos" : "neg" }, fmt.sgn((t.pf - t.pa) / Math.max(1, t.gp))) },
     { k: "home", label: "Home", nosort: true, fmt: t => `${t.homeRec[0]}-${t.homeRec[1]}` },
     { k: "away", label: "Away", nosort: true, fmt: t => `${t.awayRec[0]}-${t.awayRec[1]}` },
-    sport === "cbb" ? { k: "conf", label: "Conf", asc: true, fmt: t => h("span", { class: "muted small" }, `${t.conf} ${t.confRec[0]}-${t.confRec[1]}`) }
-      : { k: "standing", label: "Division", asc: true, fmt: t => h("span", { class: "muted small" }, t.standing || "") },
+    view === "conf" && !college ? { k: "div", label: "Division", asc: true, fmt: t => h("span", { class: "muted small" }, t.div || "") } : null,
+    view === "league" ? { k: "conf", label: college ? "Conference" : "Conf", asc: true, fmt: t => h("span", { class: "muted small" }, college ? t.conf : t.div || t.conf) } : null,
     { k: "rank", label: "Power #", num: true, asc: true },
   ].filter(Boolean);
+  const sortKey = college ? "crec" : nhl ? "pts" : "pct";
+  const group = (key, order) => {
+    const by = {};
+    for (const t of rows) (by[t[key]] ||= []).push(t);
+    return order ? order.filter(k => by[k]).map(k => [k, by[k]]) : Object.entries(by).sort(([a], [b]) => a.localeCompare(b));
+  };
+  const box = h("div");
+  const views = college ? [["conf", "By conference"], ["league", "All teams"]] : [["conf", "By conference"], ["div", "By division"], ["league", "League"]];
+  if (!views.some(([k]) => k === _standView)) _standView = "conf";
+  const draw = () => {
+    const v = _standView, A = ALIGN[sport] || {};
+    const groups = v === "league" ? [[null, rows]]
+      : v === "div" ? group("div", Object.values(A).flatMap(ds => Object.keys(ds)))
+      : group("conf", college ? null : Object.keys(A));
+    box.replaceChildren(h("div", { class: v === "div" ? "grid g2" : "grid" }, groups.map(([name, rs]) =>
+      h("div", { class: "card tight" }, name ? h("h2", {}, name) : null, table(cols(v), rs, { sort: sortKey })))));
+  };
+  draw();
   mount(h("h1", {}, `${SPORTS[sport].full} Standings`),
-        h("p", { class: "lede" }, "Computed from every final game on ESPN's scoreboard this season."),
-        h("div", { class: "card tight" }, table(cols, rows, { sort: "pct" })));
+        h("p", { class: "lede" }, `Computed from every final game on ESPN's scoreboard this season. ${college ? "Sorted by conference record." : nhl ? "Sorted by points (2 per win, 1 per overtime loss)." : "Sorted by win %."} Click any column to re-sort.`),
+        h("div", { class: "toolbar" }, seg(views, _standView, k => { _standView = k; draw(); })),
+        box);
 };
 
 function rumorItem(sport, d, x) {
