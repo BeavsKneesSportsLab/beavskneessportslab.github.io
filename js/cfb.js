@@ -375,3 +375,82 @@ CFB.poll = async () => {
     body);
   draw();
 };
+
+/* NFL Pipeline: how many players on NFL rosters each FBS program produced; #/cfb/nflpipe/{schoolId} opens one list */
+CFB.nflPipe = async (args = []) => {
+  const [d, a] = await Promise.all([sportData("cfb"), load("cfb_nfl")]);
+  const STAT = { act: ["Active", ""], ir: ["IR / out", "warn"], sus: ["Suspended", "bad"], ps: ["Practice squad", ""] };
+  const rows = d.teams.map(t => {
+    const ps = (a.schools[t.id]?.players || []);
+    const n = k => ps.filter(p => p[4] === k).length;
+    return { id: t.id, t, players: ps, act: n("act"), ir: n("ir") + n("sus"), ps: n("ps"), on: ps.filter(p => p[4] !== "ps").length };
+  });
+  const ranked = rows.slice().sort((x, y) => y.on - x.on);
+  ranked.forEach((r, i) => r.rk = i && r.on === ranked[i - 1].on ? ranked[i - 1].rk : i + 1);
+  const go = id => { location.hash = `#/cfb/nflpipe/${id}`; };
+  const countBtn = (r, v, title) => v ? h("a", { href: `#/cfb/nflpipe/${r.id}`, class: "mono", title, style: { fontWeight: 700 } }, v) : h("span", { class: "muted" }, "0");
+  let q = "", conf = "";
+  const confs = [...new Set(d.teams.map(t => t.conf))].sort();
+  const filt = () => rows.filter(r => (!conf || r.t.conf === conf) && (!q || r.t.name.toLowerCase().includes(q)));
+  const tbl = table([
+    { k: "rk", label: "#", num: true, asc: true },
+    { k: "t", label: "Team", sort: r => r.t.name, asc: true, fmt: r => teamLink("cfb", r.t) },
+    { k: "conf", label: "Conf", sort: r => r.t.conf, asc: true, fmt: r => r.t.conf },
+    { k: "on", label: "NFL players", num: true, title: "On NFL rosters: active + injured reserve/out + suspended. Click to see who.", fmt: r => countBtn(r, r.on, "See every player") },
+    { k: "act", label: "Active", num: true },
+    { k: "ir", label: "IR / out", num: true },
+    { k: "ps", label: "Practice sq.", num: true, title: "Practice squad (not in the NFL players count)" },
+  ], filt(), { sort: "on", maxH: "640px", onRow: r => go(r.id) });
+
+  const sel = args[0] && rows.find(r => r.id === args[0]);
+  let detail = null;
+  if (sel) {
+    let pos = "";
+    const nflT = id => a.nfl[id] || ["", "", ""];
+    const posList = [...new Set(sel.players.map(p => p[3]).filter(Boolean))].sort();
+    const pRows = () => sel.players.filter(p => !pos || p[3] === pos).map(p => ({ name: p[0], tid: p[1], abbr: p[2], pos: p[3], st: p[4], exp: p[5], pid: p[6] }));
+    const pTbl = table([
+      { k: "name", label: "Player", asc: true, fmt: p => h("a", { href: `#/nfl/player/${p.tid}/${p.pid}` }, h("b", {}, p.name)) },
+      { k: "pos", label: "Pos", asc: true },
+      { k: "abbr", label: "NFL team", asc: true, fmt: p => h("a", { class: "team-cell", href: `#/nfl/team/${p.tid}` },
+          nflT(p.tid)[2] ? h("img", { class: "logo", src: nflT(p.tid)[2], alt: "", loading: "lazy" }) : null, h("span", {}, nflT(p.tid)[1] || p.abbr)) },
+      { k: "st", label: "Status", sort: p => ["act", "ir", "sus", "ps"].indexOf(p.st), asc: true, fmt: p => h("span", { class: `chip ${STAT[p.st][1]}` }, STAT[p.st][0]) },
+      { k: "exp", label: "NFL yrs", num: true, title: "Accrued NFL seasons before this one (0 = rookie)", fmt: p => p.exp ? p.exp : h("span", { class: "chip accent" }, "Rookie") },
+    ], pRows(), { sort: "st", asc: true, maxH: "560px" });
+    const nTeams = new Set(sel.players.filter(p => p[4] !== "ps").map(p => p[1])).size;
+    detail = h("div", { class: "card tight", style: { marginBottom: "16px" } },
+      h("div", { class: "card-head" },
+        h("h2", { class: "team-cell" }, logo(sel.t), `${sel.t.name}: ${sel.on} NFL player${sel.on === 1 ? "" : "s"}`),
+        h("div", { class: "toolbar", style: { margin: 0 } },
+          posList.length > 1 ? h("select", { onchange: e => { pos = e.target.value; pTbl.redraw(pRows()); } }, h("option", { value: "" }, "All positions"), posList.map(x => h("option", { value: x }, x))) : null,
+          h("a", { href: "#/cfb/nflpipe", class: "chip" }, "✕ Close"))),
+      h("p", { class: "muted small", style: { padding: "0 16px" } },
+        `#${sel.rk} in FBS · ${sel.act} active, ${sel.ir} on IR/out or suspended, across ${nTeams} NFL teams` + (sel.ps ? ` · plus ${sel.ps} on practice squads (listed, not counted)` : "")),
+      sel.players.length ? pTbl : h("div", { class: "empty" }, "No players from this program on an NFL roster right now."));
+  }
+  const total = rows.reduce((s, r) => s + r.on, 0), ps = rows.reduce((s, r) => s + r.ps, 0);
+  const top = ranked.slice(0, 10), max = top[0].on;
+  mount(
+    h("h1", {}, "NFL Pipeline"),
+    h("p", { class: "lede" }, `How many players each FBS program has on NFL rosters right now. Click any count to see exactly who is being counted. ${total.toLocaleString()} of the league's ${a.players.toLocaleString()} rostered players came from these ${rows.length} schools (plus ${ps} on practice squads).`),
+    detail,
+    h("div", { class: "grid g2" },
+      h("div", { class: "card" }, h("h2", {}, "Top 10 pipelines"),
+        top.map(r => h("a", { href: `#/cfb/nflpipe/${r.id}`, style: { display: "grid", gridTemplateColumns: "28px minmax(0,150px) 1fr 34px", gap: "8px", alignItems: "center", padding: "5px 0", color: "inherit" } },
+          h("span", { class: "muted mono" }, r.rk), h("span", { class: "team-cell" }, logo(r.t), r.t.short),
+          h("div", { class: "bar" }, h("i", { style: { width: `${100 * r.on / max}%` } })), h("b", { class: "mono num" }, r.on)))),
+      h("div", { class: "card" }, h("h2", {}, "By conference"),
+        table([
+          { k: "c", label: "Conf", asc: true },
+          { k: "n", label: "NFL players", num: true },
+          { k: "avg", label: "Per school", num: true, fmt: x => fmt.n(x.avg) },
+        ], confs.map(c => { const rs = rows.filter(r => r.t.conf === c); const n = rs.reduce((s, r) => s + r.on, 0); return { c, n, avg: n / rs.length }; }),
+        { sort: "n" }))),
+    h("div", { class: "card tight", style: { marginTop: "16px" } },
+      h("div", { class: "card-head" }, h("h2", {}, "Every FBS program"),
+        h("div", { class: "toolbar", style: { margin: 0 } },
+          h("input", { placeholder: "Team…", oninput: e => { q = e.target.value.toLowerCase(); tbl.redraw(filt()); } }),
+          h("select", { onchange: e => { conf = e.target.value; tbl.redraw(filt()); } }, h("option", { value: "" }, "All conferences"), confs.map(c => h("option", { value: c }, c))))),
+      tbl),
+    h("div", { class: "note" }, a.method + ` Updated ${fmt.ago(a.generated)}.`));
+};

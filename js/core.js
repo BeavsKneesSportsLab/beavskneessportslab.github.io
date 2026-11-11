@@ -2,7 +2,7 @@
 const SPORTS = {
   cfb: { name: "CFB", full: "College Football", path: "football/college-football", featured: true,
          tabs: [["poll", "Beavs Knees Poll"], ["ratings", "Power Ratings"], ["predictions", "Predictions"], ["standings", "Standings"], ["playoff", "Playoff Odds"], ["heisman", "Heisman"], ["disappoint", "Most Disappointing"],
-                ["recruiting", "Recruiting"], ["portal", "Transfer Portal"], ["record", "Model vs Market"], ["sim", "Game Sim"], ["teams", "Teams"], ["board", "Message Board"]] },
+                ["recruiting", "Recruiting"], ["portal", "Transfer Portal"], ["nflpipe", "NFL Pipeline"], ["record", "Model vs Market"], ["sim", "Game Sim"], ["teams", "Teams"], ["board", "Message Board"]] },
   cbb: { name: "CBB", full: "College Basketball", path: "basketball/mens-college-basketball",
          tabs: [["ratings", "Power Ratings"], ["predictions", "Predictions"], ["record", "Model vs Market"], ["standings", "Standings"],
                 ["sim", "Game Sim"], ["teams", "Teams"], ["board", "Message Board"]] },
