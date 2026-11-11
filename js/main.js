@@ -1,6 +1,6 @@
 /* main.js — router + nav. Routes: #/  #/{sport}/{tab}[/args...] */
 const ROUTES = {
-  ratings: s => Views.ratings(s), predictions: s => Views.predictions(s), standings: s => Views.standings(s),
+  ratings: s => Views.ratings(s), predictions: s => Views.predictions(s), standings: s => Views.standings(s), hunt: s => Views.hunt(s),
   rumors: s => Views.rumors(s), record: s => Views.record(s), player: (s, a) => Players.page(s, a), compare: (s, a) => Players.compare(s, a), hotstove: s => Players.hotStove(s), projections: s => Views.projections(s), board: s => Views.board(s), teams: s => Views.teams(s), team: (s, a) => Views.team(s, a[0]),
   sim: (s, a) => Sim.view(s, a), trade: (s, a) => Trade.view(s, a),
   disappoint: () => CFB.disappoint(), playoff: () => CFB.playoff(), poll: () => CFB.poll(), heisman: () => CFB.heisman(), recruiting: () => CFB.recruiting(), portal: () => CFB.portal(),
@@ -13,7 +13,26 @@ function drawNav(sport, tab) {
     h("a", { href: "#/beavers", class: "pk-nav" + (tab === "beavers" ? " on" : "") }, "🦫 Beavers"));
   $("#subNav").replaceChildren(...(sport ? SPORTS[sport].tabs.map(([k, label]) =>
     h("a", { href: `#/${sport}/${k}`, class: k === tab || (["team", "player", "compare"].includes(tab) && k === "teams") ? "on" : "" }, label)) : []));
+  const on = $("#subNav a.on");
+  if (on) on.scrollIntoView({ block: "nearest", inline: "nearest" });
+  subArrows();
 }
+
+/* tab-row arrows: shown only when there are more tabs off that edge */
+function subArrows() {
+  const n = $("#subNav"), L = $("#subL"), R = $("#subR");
+  if (!n || !L) return;
+  L.hidden = n.scrollLeft < 4;
+  R.hidden = n.scrollLeft + n.clientWidth >= n.scrollWidth - 4;
+}
+document.addEventListener("DOMContentLoaded", () => {
+  const n = $("#subNav");
+  if (!n) return;
+  n.addEventListener("scroll", subArrows, { passive: true });
+  addEventListener("resize", subArrows);
+  $("#subL").onclick = () => n.scrollBy({ left: -0.7 * n.clientWidth });
+  $("#subR").onclick = () => n.scrollBy({ left: 0.7 * n.clientWidth });
+});
 
 async function route() {
   const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);

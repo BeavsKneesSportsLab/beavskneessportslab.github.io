@@ -269,26 +269,41 @@ const ALIGN = {
          "National League": { "NL East": "ATL MIA NYM PHI WSH", "NL Central": "CHC CIN MIL PIT STL", "NL West": "ARI COL LAD SD SF" } },
 };
 function alignOf(sport, t) {
-  if (sport === "cbb") return { conf: t.conf || "Independent", div: null };
+  if (sport === "cbb" || sport === "cfb") return { conf: t.conf && t.conf !== "Ind." ? t.conf : "Independent", div: null };
   for (const [conf, divs] of Object.entries(ALIGN[sport] || {}))
     for (const [div, teams] of Object.entries(divs)) if (teams.split(" ").includes(t.abbr)) return { conf, div };
   return { conf: "Other", div: null };
 }
+/* CFB teams only carry a record string: rebuild W-L, conference record, splits and points from the
+   schedule. Conference title games (week 15+) count overall but not in the conference record. */
+function cfbRecord(d, t) {
+  const r = { w: 0, l: 0, gp: 0, pf: 0, pa: 0, homeRec: [0, 0], awayRec: [0, 0], confRec: [0, 0] };
+  for (const g of d.schedule) {
+    if (g.state !== "post" || g.hs == null || (g.home !== t.id && g.away !== t.id)) continue;
+    const home = g.home === t.id, us = home ? g.hs : g.as, them = home ? g.as : g.hs, won = us > them;
+    const opp = d._byId[home ? g.away : g.home];
+    r.gp++; r.pf += us; r.pa += them; r[won ? "w" : "l"]++;
+    if (!g.neutral) (home ? r.homeRec : r.awayRec)[won ? 0 : 1]++;
+    if (opp && opp.conf === t.conf && t.conf !== "Ind." && (g.week || 0) < 15) r.confRec[won ? 0 : 1]++;
+  }
+  return r;
+}
 let _standView = "conf";
 Views.standings = async (sport) => {
   const d = await sportData(sport);
-  const college = sport === "cbb", nhl = sport === "nhl";
-  const rows = d.teams.map(t => ({ ...t, ...alignOf(sport, t) }));
+  const college = isCollege(sport), nhl = sport === "nhl";
+  const rows = d.teams.map(t => ({ ...t, ...(sport === "cfb" ? cfbRecord(d, t) : {}), ...alignOf(sport, t) }));
   const pct = t => college ? (t.confRec[0] + t.confRec[1] ? t.confRec[0] / (t.confRec[0] + t.confRec[1]) : -1) + t.w / Math.max(1, t.gp) / 1000
-                           : nhl ? 2 * t.w + t.otl + t.w / 1000 : t.w / Math.max(1, t.gp);
+                           : nhl ? 2 * t.w + t.otl + t.w / 1000 : (t.w + 0.5 * (t.ties || 0)) / Math.max(1, t.gp);
   const cols = view => [
     { k: "pos", label: "#", num: true, nosort: true, fmt: (t, i) => i + 1 },
     { k: "name", label: "Team", asc: true, fmt: t => teamLink(sport, t) },
     { k: "w", label: "W", num: true }, { k: "l", label: "L", num: true },
     nhl ? { k: "otl", label: "OTL", num: true } : null,
+    sport === "nfl" ? { k: "ties", label: "T", num: true, fmt: t => t.ties || 0 } : null,
     nhl ? { k: "pts", label: "PTS", num: true, sort: pct, fmt: t => 2 * t.w + t.otl } : null,
     college ? { k: "crec", label: "Conf", num: true, sort: pct, fmt: t => `${t.confRec[0]}-${t.confRec[1]}` } : null,
-    { k: "pct", label: "Win %", num: true, sort: college || nhl ? t => t.w / Math.max(1, t.gp) : pct, fmt: t => fmt.n(t.w / Math.max(1, t.gp), 3) },
+    { k: "pct", label: "Win %", num: true, sort: college || nhl ? t => t.w / Math.max(1, t.gp) : pct, fmt: t => fmt.n((t.w + 0.5 * (t.ties || 0)) / Math.max(1, t.gp), 3) },
     { k: "pf", label: "PF/G", num: true, sort: t => t.pf / Math.max(1, t.gp), fmt: t => fmt.n(t.pf / Math.max(1, t.gp)) },
     { k: "pa", label: "PA/G", num: true, sort: t => t.pa / Math.max(1, t.gp), fmt: t => fmt.n(t.pa / Math.max(1, t.gp)) },
     { k: "diff", label: "Diff/G", num: true, sort: t => (t.pf - t.pa) / Math.max(1, t.gp), fmt: t => h("span", { class: t.pf >= t.pa ? "pos" : "neg" }, fmt.sgn((t.pf - t.pa) / Math.max(1, t.gp))) },
@@ -302,7 +317,8 @@ Views.standings = async (sport) => {
   const group = (key, order) => {
     const by = {};
     for (const t of rows) (by[t[key]] ||= []).push(t);
-    return order ? order.filter(k => by[k]).map(k => [k, by[k]]) : Object.entries(by).sort(([a], [b]) => a.localeCompare(b));
+    return order ? order.filter(k => by[k]).map(k => [k, by[k]])
+      : Object.entries(by).sort(([a], [b]) => (a === "Independent") - (b === "Independent") || a.localeCompare(b));
   };
   const box = h("div");
   const views = college ? [["conf", "By conference"], ["league", "All teams"]] : [["conf", "By conference"], ["div", "By division"], ["league", "League"]];
@@ -320,6 +336,99 @@ Views.standings = async (sport) => {
         h("p", { class: "lede" }, `Computed from every final game on ESPN's scoreboard this season. ${college ? "Sorted by conference record." : nhl ? "Sorted by points (2 per win, 1 per overtime loss)." : "Sorted by win %."} Click any column to re-sort.`),
         h("div", { class: "toolbar" }, seg(views, _standView, k => { _standView = k; draw(); })),
         box);
+};
+
+/* ---------- playoff hunt: who's in, who's on the line, today ---------- */
+const HUNT_FMT = {
+  nfl: { label: "4 division winners (seeds 1-4) + 3 wild cards per conference. #1 seed gets the only bye.", divSeeds: true, inN: 7 },
+  nba: { label: "Seeds 1-6 are in. Seeds 7-10 go to the play-in for the last two spots.", inN: 6, playIn: 10 },
+  nhl: { label: "Top 3 in each division are in, plus 2 wild cards per conference (next-best by points, either division).", nhlWC: true },
+  mlb: { label: "3 division winners + 3 wild cards per league. The top two division winners get byes.", divSeeds: true, inN: 6 },
+};
+Views.hunt = async (sport) => {
+  const F = HUNT_FMT[sport];
+  const [d, odds] = await Promise.all([sportData(sport), load(`${sport}_season`).catch(() => null)]);
+  const O = Object.fromEntries((odds?.teams || []).map(x => [x.id, x]));
+  const nhl = sport === "nhl", done = sport === "mlb";
+  const rows = d.teams.map(t => ({ ...t, ...alignOf(sport, t), pts: 2 * t.w + t.otl, o: O[t.id] }));
+  // standings value + games-behind math: NHL by points, everyone else by win %
+  const val = t => nhl ? t.pts + t.w / 1000 - t.gp / 1e5 : (t.w + 0.5 * (t.ties || 0)) / Math.max(1, t.gp) + t.w / 1e5;
+  const byVal = (a, b) => val(b) - val(a);
+  const gap = (a, b) => nhl ? a.pts - b.pts : ((a.w - b.w) + (b.l - a.l)) / 2;          // a ahead of b by
+  const pct = v => v == null ? "–" : v >= 0.995 && v < 1 ? ">99%" : v > 0 && v < 0.005 ? "<1%" : fmt.pct(v);
+  const status = t => {
+    if (done) return t.seed ? h("span", { class: "chip good" }, "In") : h("span", { class: "chip" }, "Out");
+    const p = t.o?.playoffs; if (p == null) return "";
+    const [lab, cls] = p >= 0.99 ? ["Lock", "good"] : p >= 0.75 ? ["Likely", "good"] : p >= 0.25 ? ["Bubble", "accent"] : p >= 0.01 ? ["Long shot", ""] : ["Out", ""];
+    return h("span", { class: "chip " + cls }, lab);
+  };
+  const confCard = (conf, divs) => {
+    const mem = rows.filter(t => t.conf === conf).sort(byVal);
+    let order = [], zones = [];
+    if (F.divSeeds) {                                   // division leaders first, then wild cards
+      const leaders = Object.keys(divs).map(dv => mem.find(t => t.div === dv)).filter(Boolean).sort(byVal);
+      const rest = mem.filter(t => !leaders.includes(t));
+      order = [...leaders, ...rest];
+      order.forEach((t, i) => { t.seed = i < F.inN ? i + 1 : null; t.tag = i < leaders.length ? "Div. leader" : i < F.inN ? "Wild card" : ""; });
+      zones = [[F.inN, "Playoff line"]];
+    } else if (F.nhlWC) {                               // top 3 per division, then 2 wild cards
+      const top3 = Object.keys(divs).flatMap(dv => mem.filter(t => t.div === dv).slice(0, 3));
+      const wc = mem.filter(t => !top3.includes(t));
+      order = [...Object.keys(divs).flatMap(dv => top3.filter(t => t.div === dv)), ...wc];
+      order.forEach((t, i) => { const inDiv = i < top3.length; t.seed = inDiv || i < top3.length + 2 ? i + 1 : null;
+        t.tag = inDiv ? `${t.div} ${top3.filter(x => x.div === t.div).indexOf(t) + 1}` : i < top3.length + 2 ? `Wild card ${i - top3.length + 1}` : ""; });
+      zones = [[top3.length + 2, "Wild card line"]];
+    } else {                                            // NBA: 1-6 in, 7-10 play-in
+      order = mem;
+      order.forEach((t, i) => { t.seed = i + 1; t.tag = i < F.inN ? "Playoffs" : i < F.playIn ? "Play-in" : ""; if (i >= F.playIn) t.seed = null; });
+      zones = [[F.inN, "Guaranteed playoff line"], [F.playIn, "Play-in line"]];
+    }
+    const lineN = zones[zones.length - 1][0], lastIn = order[lineN - 1], firstOut = order[lineN];
+    const lineCell = (t, i) => {
+      if (!lastIn || !firstOut) return "–";
+      if (F.divSeeds && t.tag === "Div. leader") {               // a division leader's cushion is its division lead
+        const second = order.find(x => x !== t && x.div === t.div);
+        if (!second) return "–";
+        const dl = gap(t, second);
+        return h("span", { class: dl > 0 ? "pos" : "muted", title: `Lead over ${second.short || second.name} in the ${t.div}` }, dl === 0 ? "tied (div)" : `+${fmt.n(dl, Number.isInteger(dl) ? 0 : 1)} div`);
+      }
+      if (F.nhlWC && /^(Atlantic|Metropolitan|Central|Pacific) /.test(t.tag)) {   // top 3: lead over 4th in the division
+        const fourth = order.filter(x => x.div === t.div).sort(byVal)[3];
+        if (!fourth) return "–";
+        const dl = gap(t, fourth);
+        return h("span", { class: dl > 0 ? "pos" : dl < 0 ? "neg" : "muted", title: `Points ahead of ${fourth.short || fourth.name}, 4th in the ${t.div}` }, dl === 0 ? "tied (div)" : `${dl > 0 ? "+" : ""}${dl} div`);
+      }
+      // NBA: seeds 1-6 vs 7th, play-in teams vs 11th, everyone else vs 10th
+      const ref = F.playIn && i < F.inN ? order[F.inN] : firstOut, refIn = lastIn;
+      const g = i < lineN ? (ref ? gap(t, ref) : 0) : -gap(refIn, t);
+      const txt = g === 0 ? "even" : `${g > 0 ? "+" : ""}${fmt.n(g, nhl || Number.isInteger(g) ? 0 : 1)}`;
+      return h("span", { class: g > 0 ? "pos" : g < 0 ? "neg" : "muted" }, txt);
+    };
+    const head = ["#", "Team", nhl ? "W-L-OT" : "W-L", nhl ? "PTS" : "Pct", nhl ? "GP" : null, "", "Vs line", ...(done ? [] : ["Division", "Playoffs"]), "Status"].filter(x => x !== null);
+    const body = [];
+    order.forEach((t, i) => {
+      const z = zones.find(([n]) => n === i);
+      if (z) body.push(h("tr", { class: "cut-row" }, h("td", { colspan: head.length }, h("span", {}, z[1]))));
+      body.push(h("tr", { class: t.seed ? "" : "out-row" },
+        h("td", { class: "num muted" }, t.seed ?? ""),
+        h("td", {}, teamLink(sport, t)),
+        h("td", {}, fmt.rec(t)),
+        h("td", { class: "num" }, nhl ? t.pts : fmt.n((t.w + 0.5 * (t.ties || 0)) / Math.max(1, t.gp), 3)),
+        nhl ? h("td", { class: "num muted" }, t.gp) : null,
+        h("td", { class: "muted small" }, t.tag),
+        h("td", { class: "num" }, lineCell(t, i)),
+        ...(done ? [] : [h("td", { class: "num" }, pct(t.o?.div_title)), h("td", { class: "num" }, h("b", {}, pct(t.o?.playoffs)))]),
+        h("td", {}, status(t))));
+    });
+    return h("div", { class: "card tight" }, h("h2", {}, conf),
+      h("div", { class: "tbl-wrap" }, h("table", { class: "t hunt" }, h("thead", {}, h("tr", {}, head.map((x, i) => h("th", { class: i === 0 || ["PTS", "Pct", "GP", "Vs line", "Division", "Playoffs"].includes(x) ? "num" : "" }, x)))), h("tbody", {}, body))));
+  };
+  mount(h("h1", {}, `${SPORTS[sport].full} Playoff Hunt`),
+    h("p", { class: "lede" }, (done ? "The 2026 season is over - this is how the final regular-season standings set the field. " : "If the season ended today. ") + F.label +
+      (done ? "" : ` "Vs line" is ${nhl ? "points" : "games"} ahead of the first team out (or behind the last team in)${F.divSeeds ? "; for division leaders it's their lead in the division" : ""}. Division and Playoffs are our odds from ${odds ? odds.sims.toLocaleString() : "10,000"} simulations of the rest of the season.`)),
+    h("div", { class: "grid hunt-grid" }, Object.entries(ALIGN[sport]).map(([conf, divs]) => confCard(conf, divs))),
+    h("div", { class: "note" }, (done ? "" : "Status comes from the simulated odds: Lock 99%+, Likely 75%+, Bubble 25-75%, Long shot 1-25%, Out under 1%. ") +
+      "Tiebreakers are simplified to record, so two teams level on record may be ordered differently than the league's official standings."));
 };
 
 function rumorItem(sport, d, x) {

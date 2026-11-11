@@ -7,7 +7,8 @@ const PAGES = [
   ["How it works", "#/about", "What the numbers mean"], ["Beavs Knees Poll", "#/cfb/poll", "CFB"],
   ["Playoff Odds", "#/cfb/playoff", "CFB"], ["Heisman", "#/cfb/heisman", "CFB"], ["Transfer Portal", "#/cfb/portal", "CFB"],
   ["Recruiting", "#/cfb/recruiting", "CFB"],
-  ...Object.entries(SPORTS).flatMap(([k, s]) => [[`${s.name} Power Ratings`, `#/${k}/ratings`, s.full], [`${s.name} Predictions`, `#/${k}/predictions`, s.full]]),
+  ...Object.entries(SPORTS).flatMap(([k, s]) => [[`${s.name} Power Ratings`, `#/${k}/ratings`, s.full], [`${s.name} Predictions`, `#/${k}/predictions`, s.full],
+    [`${s.name} Standings`, `#/${k}/standings`, s.full], ...(s.tabs.some(([t]) => t === "hunt") ? [[`${s.name} Playoff Hunt`, `#/${k}/hunt`, s.full]] : [])]),
 ];
 const Search = {
   _idx: null,

@@ -1,7 +1,7 @@
 /* core.js — data loading, routing, DOM + formatting helpers shared by every view. */
 const SPORTS = {
   cfb: { name: "CFB", full: "College Football", path: "football/college-football", featured: true,
-         tabs: [["poll", "Beavs Knees Poll"], ["ratings", "Power Ratings"], ["predictions", "Predictions"], ["playoff", "Playoff Odds"], ["heisman", "Heisman"], ["disappoint", "Most Disappointing"],
+         tabs: [["poll", "Beavs Knees Poll"], ["ratings", "Power Ratings"], ["predictions", "Predictions"], ["standings", "Standings"], ["playoff", "Playoff Odds"], ["heisman", "Heisman"], ["disappoint", "Most Disappointing"],
                 ["recruiting", "Recruiting"], ["portal", "Transfer Portal"], ["record", "Model vs Market"], ["sim", "Game Sim"], ["teams", "Teams"], ["board", "Message Board"]] },
   cbb: { name: "CBB", full: "College Basketball", path: "basketball/mens-college-basketball",
          tabs: [["ratings", "Power Ratings"], ["predictions", "Predictions"], ["record", "Model vs Market"], ["standings", "Standings"],
@@ -11,7 +11,7 @@ const SPORTS = {
   mlb: { name: "MLB", full: "MLB", path: "baseball/mlb" },
   nhl: { name: "NHL", full: "NHL", path: "hockey/nhl" },
 };
-const PRO_TABS = [["ratings", "Power Ratings"], ["predictions", "Predictions"], ["projections", "Season Odds"], ["record", "Model vs Market"], ["standings", "Standings"],
+const PRO_TABS = [["ratings", "Power Ratings"], ["predictions", "Predictions"], ["projections", "Season Odds"], ["record", "Model vs Market"], ["standings", "Standings"], ["hunt", "Playoff Hunt"],
                   ["rumors", "Trade Rumors"], ["trade", "Trade Simulator"], ["sim", "Game Sim"], ["teams", "Teams"], ["board", "Message Board"]];
 for (const k of ["nfl", "nba", "mlb", "nhl"]) SPORTS[k].tabs = k === "mlb"
   ? PRO_TABS.map(([t, l]) => t === "projections" ? ["hotstove", "Hot Stove"] : [t, l]) : PRO_TABS;
@@ -89,7 +89,7 @@ const fmt = {
     const m = (Date.now() - new Date(s)) / 6e4;
     return m < 60 ? `${Math.max(1, m | 0)}m ago` : m < 1440 ? `${(m / 60) | 0}h ago` : `${(m / 1440) | 0}d ago`;
   },
-  rec: t => t.otl ? `${t.w}-${t.l}-${t.otl}` : `${t.w}-${t.l}`,
+  rec: t => t.otl ? `${t.w}-${t.l}-${t.otl}` : t.ties ? `${t.w}-${t.l}-${t.ties}` : `${t.w}-${t.l}`,
 };
 function spreadText(sport, d, g) {
   // margin > 0 means home favored; football/basketball show a spread, hockey/baseball a run/goal edge.
