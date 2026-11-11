@@ -432,7 +432,7 @@ CFB.nflPipe = async (args = []) => {
   const top = ranked.slice(0, 10), max = top[0].on;
   mount(
     h("h1", {}, "NFL Pipeline"),
-    h("p", { class: "lede" }, `How many players each FBS program has on NFL rosters right now. Click any count to see exactly who is being counted. ${total.toLocaleString()} of the league's ${a.players.toLocaleString()} rostered players came from these ${rows.length} schools (plus ${ps} on practice squads).`),
+    h("p", { class: "lede" }, `How many players each FBS program has on NFL rosters right now. Click any count to see exactly who is being counted. ${total.toLocaleString()} NFL players came from these ${rows.length} schools, plus ${ps} more on practice squads (the league has ${a.players.toLocaleString()} players counting practice squads).`),
     detail,
     h("div", { class: "grid g2" },
       h("div", { class: "card" }, h("h2", {}, "Top 10 pipelines"),
