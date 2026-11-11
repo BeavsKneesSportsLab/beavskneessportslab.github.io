@@ -3,7 +3,7 @@
    straight up at the DraftKings moneyline. Scored in units so sports compare fairly: spread +1 cover /
    -1 miss / 0 push; moneyline pays the odds picked at (+150 -> +1.5, -150 -> +0.67), a miss is -1.
    Accounts and picks live in Supabase (email magic link). Grading happens here from the site's final
-   scores; a pick the server stamped after kickoff is void. "Beavs Model" plays too. */
+   scores; a pick the server stamped after kickoff is void. "Beavs Model" plays every slate on its own, picked or not. */
 const SUPA = { url: "https://uamgliqqkdgbozqyufvj.supabase.co", key: "sb_publishable_kBQ7ZvABLuoiuwDKuXcStQ_ndwXqGex" };
 const Pickem = {};
 const PK_SPORTS = ["cfb", "cbb", "nfl", "nba", "nhl", "mlb"];
@@ -158,27 +158,49 @@ Pickem.view = async () => {
       }
       return Object.entries(agg).map(([u, a]) => ({ who: name[u] || "anonymous", ...a, pct: a.w / Math.max(1, a.w + a.l) }));
     };
-    // the model on every graded game anyone picked, at the closing line
-    const modelRow = filter => {
-      const games = {};
-      for (const p of picks) if (!filter || filter(p)) games[p.game_id] = p.sport;
+    // the model plays EVERY pick'em slate since launch on its own (pregame snapshot vs the closing line),
+    // rebuilt from the ledgers with the same "biggest games + the Beavs" rule, ranks frozen at kickoff
+    const PK_START = "2026-10-27";
+    const slateKeyOf = (sp, gid, e) => DAILY.has(sp) ? ptDay(e.date) : `${D[sp].season || 2026}-w${sched[sp][gid]?.week ?? "?"}`;
+    const modelGames = {};                     // sport -> slate key -> [[gid, entry]]
+    for (const sp of PK_SPORTS) {
+      const T = D[sp]._byId, by = {};
+      for (const [gid, e] of Object.entries(ledgers[sp]?.games || {})) {
+        if (ptDay(e.date) < PK_START || !T[e.home] || !T[e.away]) continue;
+        (by[slateKeyOf(sp, gid, e)] ||= []).push([gid, e]);
+      }
+      const n = sp === "cfb" ? 10 : sp === "cbb" ? CBB_PER_DAY : 0;
+      if (n) for (const k in by) {
+        const r = ([gid, e], i) => e.rk?.[i] ?? T[i ? e.away : e.home].rank ?? 400;
+        const score = x => Math.min(r(x, 0), r(x, 1)) + 0.35 * Math.max(r(x, 0), r(x, 1));
+        const beavs = by[k].filter(([, e]) => [T[e.home].abbr, T[e.away].abbr].includes("ORST"));
+        by[k] = [...new Set([...beavs, ...[...by[k]].sort((x, y) => score(x) - score(y)).slice(0, n)])];
+      }
+      modelGames[sp] = by;
+    }
+    const modelRow = (sp, wk) => {
       const a = { w: 0, l: 0, p: 0, u: 0 };
-      for (const [gid, sp] of Object.entries(games)) {
-        const e = ledgers[sp]?.games?.[gid];
-        if (!e || e.hs == null || !e.close || !e.model) continue;
-        if (ML_SPORTS.has(sp)) {
-          const q = noVigHome(e.close); if (q == null) continue;
-          const home = e.model.pHome > q, won = (e.hs > e.as) === home;
-          const ml = home ? e.close.mlH : e.close.mlA;
-          if (won) { a.w++; a.u += mlPay(ml); } else { a.l++; a.u -= 1; }
-        } else {
-          if (e.close.spread == null) continue;
-          const edge = e.model.margin + e.close.spread, res = (e.hs - e.as) + e.close.spread;
-          if (res === 0) a.p++; else if ((res > 0) === (edge > 0)) { a.w++; a.u += 1; } else { a.l++; a.u -= 1; }
+      for (const s2 of sp ? [sp] : PK_SPORTS) for (const [k, list] of Object.entries(modelGames[s2])) {
+        if (wk && k !== wk) continue;
+        for (const [, e] of list) {
+          if (e.hs == null || !e.close || !e.model) continue;
+          if (ML_SPORTS.has(s2)) {
+            const q = noVigHome(e.close); if (q == null) continue;
+            const home = e.model.pHome > q, won = (e.hs > e.as) === home;
+            const ml = home ? e.close.mlH : e.close.mlA; if (ml == null) continue;
+            if (won) { a.w++; a.u += mlPay(ml); } else { a.l++; a.u -= 1; }
+          } else {
+            if (e.close.spread == null) continue;
+            const edge = e.model.margin + e.close.spread, res = (e.hs - e.as) + e.close.spread;
+            if (res === 0 || Math.abs(edge) < 1e-9) a.p++; else if ((res > 0) === (edge > 0)) { a.w++; a.u += 1; } else { a.l++; a.u -= 1; }
+          }
         }
       }
       return a.w + a.l + a.p ? { who: "🦫 Beavs Model", ...a, pct: a.w / Math.max(1, a.w + a.l), bot: true } : null;
     };
+    // slates the model has graded games in (so the "By slate" picker shows them even if nobody played)
+    const modelKeys = sp => (sp ? [sp] : PK_SPORTS).flatMap(s2 => Object.entries(modelGames[s2])
+      .filter(([, list]) => list.some(([, e]) => e.hs != null && e.close)).map(([k]) => `${s2}|${k}`));
     const cols = [
       { k: "rank", label: "#", num: true, nosort: true, fmt: (r, i) => i + 1 },
       { k: "who", label: "Player", nosort: true, fmt: r => r.bot ? h("b", { class: "muted" }, r.who) : h("b", {}, r.who) },
@@ -186,8 +208,14 @@ Pickem.view = async () => {
       { k: "pct", label: "Win %", num: true, fmt: r => fmt.pct(r.pct, 1) },
       { k: "u", label: "Units", num: true, fmt: r => h("b", { class: r.u >= 0 ? "pos" : "neg" }, fmt.sgn(r.u, 2)) },
     ];
-    const withModel = (rows, f, sp, wk) => {
-      const m = modelRow(f); if (m) rows.push(m);
+    // newest slate first: daily keys are dates; weekly ones sort by their last game
+    const slateDate = k => { const [sp, wk] = k.split("|");
+      if (!/w\d+$/.test(wk)) return wk;
+      const ds = (modelGames[sp]?.[wk] || []).map(([, e]) => ptDay(e.date));
+      if (!ds.length) for (const p of picks) if (p.sport === sp && p.week === wk && sched[sp][p.game_id]) ds.push(ptDay(sched[sp][p.game_id].date));
+      return ds.sort().pop() || ""; };
+    const withModel = (rows, sp, wk) => {
+      const m = modelRow(sp, wk); if (m) rows.push(m);
       return rows; };
     // latest finished slate per sport -> its winner
     const champs = () => PK_SPORTS.map(sp => {
@@ -204,12 +232,12 @@ Pickem.view = async () => {
     const seasonBox = h("div"), periodBox = h("div"), periodSel = h("div");
     const drawSeason = () => {
       const f = boardSport === "all" ? null : p => p.sport === boardSport;
-      const rows = withModel(rowsFor(f), f, boardSport === "all" ? null : boardSport);
+      const rows = withModel(rowsFor(f), boardSport === "all" ? null : boardSport);
       seasonBox.replaceChildren(rows.length ? table(cols, rows, { sort: "u" }) : h("div", { class: "empty" }, "No graded picks yet - results post the morning after games."));
-      const keys = [...new Set(picks.filter(p => !f || f(p)).map(p => `${p.sport}|${p.week}`))].sort((a, b) => b.split("|")[1].localeCompare(a.split("|")[1]));
+      const keys = [...new Set([...picks.filter(p => !f || f(p)).map(p => `${p.sport}|${p.week}`), ...modelKeys(boardSport === "all" ? null : boardSport)])].sort((a, b) => slateDate(b).localeCompare(slateDate(a)));
       const label = k => { const [sp, wk] = k.split("|"); return `${SPORTS[sp].name} ${/w\d+$/.test(wk) ? "week " + wk.split("w")[1] : new Date(wk + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}`; };
       const drawPeriod = k => { const [sp, wk] = k.split("|"); const f2 = p => p.sport === sp && p.week === wk;
-        const r2 = withModel(rowsFor(f2), f2, sp, wk);
+        const r2 = withModel(rowsFor(f2), sp, wk);
         periodBox.replaceChildren(r2.length ? table(cols, r2, { sort: "u" }) : h("div", { class: "empty" }, "Nothing graded yet for that slate.")); };
       periodSel.replaceChildren(keys.length ? h("select", { class: "in", onchange: e => drawPeriod(e.target.value) }, keys.map(k => h("option", { value: k }, label(k)))) : "");
       if (keys.length) drawPeriod(keys[0]); else periodBox.replaceChildren(h("div", { class: "empty" }, "No slates played yet."));
