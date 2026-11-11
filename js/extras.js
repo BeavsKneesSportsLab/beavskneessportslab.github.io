@@ -7,14 +7,15 @@ const PAGES = [
   ["How it works", "#/about", "What the numbers mean"], ["Beavs Knees Poll", "#/cfb/poll", "CFB"],
   ["Playoff Odds", "#/cfb/playoff", "CFB"], ["Heisman", "#/cfb/heisman", "CFB"], ["Transfer Portal", "#/cfb/portal", "CFB"],
   ["Recruiting", "#/cfb/recruiting", "CFB"], ["NFL Pipeline", "#/cfb/nflpipe", "CFB · NFL players per school"],
-  ...Object.entries(SPORTS).flatMap(([k, s]) => [[`${s.name} Power Ratings`, `#/${k}/ratings`, s.full], [`${s.name} Predictions`, `#/${k}/predictions`, s.full],
+  ["UFC Fight Cards", "#/ufc/cards", "UFC"], ["UFC Results", "#/ufc/results", "UFC"], ["UFC Rankings", "#/ufc/rankings", "UFC"], ["UFC Fighter Ratings", "#/ufc/elo", "UFC · Elo"], ["UFC Model vs Market", "#/ufc/ufcmarket", "UFC"],
+  ...Object.entries(SPORTS).filter(([, s]) => !s.noTeams).flatMap(([k, s]) => [[`${s.name} Power Ratings`, `#/${k}/ratings`, s.full], [`${s.name} Predictions`, `#/${k}/predictions`, s.full],
     [`${s.name} Standings`, `#/${k}/standings`, s.full], ...(s.tabs.some(([t]) => t === "hunt") ? [[`${s.name} Playoff Hunt`, `#/${k}/hunt`, s.full]] : [])]),
 ];
 const Search = {
   _idx: null,
   async index() {
     if (this._idx) return this._idx;
-    const sports = Object.keys(SPORTS);
+    const sports = Object.keys(SPORTS).filter(k => !SPORTS[k].noTeams);
     const [datas, players] = await Promise.all([
       Promise.all(sports.map(s => sportData(s).catch(() => null))),
       Promise.all(sports.map(s => playerIndex(s)))]);
@@ -28,6 +29,9 @@ const Search = {
         out.push({ kind: "player", sport: s, t, name, pos, href: `#/${s}/player/${tid}/${pid}`, keys: [name.toLowerCase()] });
       }
     });
+    const ufc = await load("ufc").catch(() => null);
+    if (ufc) for (const [id, f] of Object.entries(ufc.fighters)) if (f.name)
+      out.push({ kind: "fighter", sport: "ufc", name: f.name, f, href: `#/ufc/fighter/${id}`, keys: [f.name.toLowerCase()] });
     for (const [name, href, sub] of PAGES) out.push({ kind: "page", name, sub, href, keys: [name.toLowerCase()] });
     return (this._idx = out);
   },
@@ -54,9 +58,9 @@ const Search = {
     const close = () => { modal.remove(); document.removeEventListener("keydown", onKey); };
     const go = x => { close(); location.hash = x.href; };
     const draw = () => list.replaceChildren(...(hits.length ? hits.map((x, i) => h("a", { class: "search-hit" + (i === sel ? " on" : ""), href: x.href, onclick: e => { e.preventDefault(); go(x); } },
-      x.kind === "page" ? h("span", { class: "logo" }, "↗") : logo(x.t),
+      x.kind === "page" ? h("span", { class: "logo" }, "↗") : x.kind === "fighter" ? (x.f.img ? h("img", { class: "logo", src: x.f.img, alt: "", style: { borderRadius: "50%", objectFit: "cover" } }) : h("span", { class: "logo" }, "🥊")) : logo(x.t),
       h("span", { class: "search-nm" }, x.kind === "team" ? x.t.name : x.name),
-      h("span", { class: "muted small" }, x.kind === "team" ? `${SPORTS[x.sport].name} team` : x.kind === "player" ? `${x.pos} · ${x.t.short} · ${SPORTS[x.sport].name}` : x.sub)))
+      h("span", { class: "muted small" }, x.kind === "team" ? `${SPORTS[x.sport].name} team` : x.kind === "fighter" ? `UFC fighter${x.f.wcLast ? " · " + x.f.wcLast : ""}` : x.kind === "player" ? `${x.pos} · ${x.t.short} · ${SPORTS[x.sport].name}` : x.sub)))
       : [h("div", { class: "muted small" }, input.value.trim().length < 2 ? "Keep typing…" : "No matches.")]));
     const onKey = e => {
       if (e.key === "Escape") close();

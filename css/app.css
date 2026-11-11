@@ -457,3 +457,29 @@ a.osu-pl:hover { border-color: var(--accent); }
 .t.hunt tr.cut-row td span { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; }
 .t.hunt tr.out-row td { opacity: .78; }
 .hunt-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 620px), 1fr)); }
+
+/* ---------- UFC ---------- */
+.ufc-photo { border-radius: 50%; object-fit: cover; object-position: top; background: var(--chip); flex: none; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; color: var(--muted); }
+.ufc-fight { border-top: 1px solid var(--line); padding: 12px 0; }
+.ufc-fight:first-of-type { border-top: 0; }
+.ufc-meta { margin-bottom: 8px; }
+.ufc-pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: center; }
+.ufc-side { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.ufc-side.r { flex-direction: row-reverse; text-align: right; }
+.ufc-who { min-width: 0; }
+.ufc-who .ufc-name { font-weight: 700; }
+.ufc-odds { margin-top: 2px; }
+.ufc-vs { font-weight: 700; font-size: 12px; }
+.ufc-probs { margin-top: 10px; display: grid; gap: 4px; }
+.ufc-pb { display: flex; align-items: center; gap: 8px; }
+.ufc-split { flex: 1; height: 8px; border-radius: 4px; background: var(--chip); position: relative; overflow: hidden; }
+.ufc-split > i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); }
+.ufc-rk { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-top: 1px solid var(--line); font-size: 13.5px; }
+.ufc-rk.champ { background: var(--panel2); border-radius: 8px; border-top: 0; }
+.ufc-hero { display: flex; gap: 18px; align-items: center; }
+@media (max-width: 600px) {
+  .ufc-pair { grid-template-columns: minmax(0, 1fr); }
+  .ufc-side.r { flex-direction: row; text-align: left; }
+  .ufc-vs { display: none; }
+  .ufc-side + .ufc-vs + .ufc-side { border-top: 1px dashed var(--line); padding-top: 8px; }
+}

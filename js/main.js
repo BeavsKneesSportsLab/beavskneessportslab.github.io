@@ -1,18 +1,18 @@
 /* main.js — router + nav. Routes: #/  #/{sport}/{tab}[/args...] */
 const ROUTES = {
   ratings: s => Views.ratings(s), predictions: s => Views.predictions(s), standings: s => Views.standings(s), hunt: s => Views.hunt(s),
-  rumors: s => Views.rumors(s), record: s => Views.record(s), player: (s, a) => Players.page(s, a), compare: (s, a) => Players.compare(s, a), hotstove: s => Players.hotStove(s), projections: s => Views.projections(s), board: s => Views.board(s), teams: s => Views.teams(s), team: (s, a) => Views.team(s, a[0]),
+  rumors: s => Views.rumors(s), record: s => Views.record(s), player: (s, a) => Players.page(s, a), compare: (s, a) => Players.compare(s, a), hotstove: s => Players.hotStove(s), cards: (s, a) => UFC.cards(a), results: (s, a) => UFC.results(a), rankings: () => UFC.rankings(), elo: () => UFC.elo(), ufcmarket: () => UFC.market(), fighter: (s, a) => UFC.fighter(a), projections: s => Views.projections(s), board: s => Views.board(s), teams: s => Views.teams(s), team: (s, a) => Views.team(s, a[0]),
   sim: (s, a) => Sim.view(s, a), trade: (s, a) => Trade.view(s, a),
   disappoint: () => CFB.disappoint(), playoff: () => CFB.playoff(), poll: () => CFB.poll(), heisman: () => CFB.heisman(), recruiting: () => CFB.recruiting(), portal: () => CFB.portal(), nflpipe: (s, a) => CFB.nflPipe(a),
 };
 
 function drawNav(sport, tab) {
   $("#sportNav").replaceChildren(...Object.entries(SPORTS).map(([k, s]) =>
-    h("a", { href: `#/${k}/${k === "cfb" ? "ratings" : "predictions"}`, class: k === sport ? "on" : "" }, s.name, s.featured ? h("span", { class: "star" }, "★") : null)),
+    h("a", { href: `#/${k}/${defaultTab(k)}`, class: k === sport ? "on" : "" }, s.name, s.featured ? h("span", { class: "star" }, "★") : null)),
     h("a", { href: "#/pickem", class: "pk-nav" + (tab === "pickem" ? " on" : "") }, "Pick'em"),
     h("a", { href: "#/beavers", class: "pk-nav" + (tab === "beavers" ? " on" : "") }, "🦫 Beavers"));
   $("#subNav").replaceChildren(...(sport ? SPORTS[sport].tabs.map(([k, label]) =>
-    h("a", { href: `#/${sport}/${k}`, class: k === tab || (["team", "player", "compare"].includes(tab) && k === "teams") ? "on" : "" }, label)) : []));
+    h("a", { href: `#/${sport}/${k}`, class: k === tab || (["team", "player", "compare"].includes(tab) && k === "teams") || (tab === "fighter" && k === "elo") ? "on" : "" }, label)) : []));
   const on = $("#subNav a.on");
   if (on) on.scrollIntoView({ block: "nearest", inline: "nearest" });
   subArrows();
@@ -37,7 +37,7 @@ document.addEventListener("DOMContentLoaded", () => {
 async function route() {
   const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   const sport = SPORTS[parts[0]] ? parts[0] : null;
-  const tab = sport ? parts[1] || (sport === "cfb" ? "ratings" : "predictions") : ["pickem", "beavers", "about"].includes(parts[0]) ? parts[0] : null;
+  const tab = sport ? parts[1] || defaultTab(sport) : ["pickem", "beavers", "about"].includes(parts[0]) ? parts[0] : null;
   drawNav(sport, tab);
   const meta = await load("meta").catch(() => ({}));
   const m = sport && meta[sport];
