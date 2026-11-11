@@ -162,9 +162,34 @@ CFB.portal = async () => {
     h("div", { class: "note" }, p.method + (p.liveNext ? "" : ` The ${p.cycle + 1} portal window has not opened yet; once entries appear in the data feed they show up here on the next build.`)));
 };
 
+/* team page: how many of this program's players are on NFL rosters, top names, link to the full list */
+function nflCard(d, a, id) {
+  const on = sid => (a.schools[sid]?.players || []).filter(x => x[4] !== "ps").length;
+  const ps = a.schools[id]?.players || [], n = on(id);
+  const rk = 1 + d.teams.filter(t => on(t.id) > n).length;
+  const c = k => ps.filter(x => x[4] === k).length;
+  const show = ps.filter(x => x[4] !== "ps").slice(0, 8);
+  const nt = tid => a.nfl[tid] || [];
+  return h("div", { class: "card" },
+    h("div", { class: "card-head" }, h("h2", {}, "In the NFL"), n ? h("a", { href: `#/cfb/nflpipe/${id}`, class: "small" }, `See all ${n} →`) : null),
+    h("div", { class: "kpis", style: { marginTop: 0 } },
+      h("div", { class: "kpi" }, h("span", {}, "NFL players"), h("b", {}, h("a", { href: `#/cfb/nflpipe/${id}` }, n))),
+      h("div", { class: "kpi" }, h("span", {}, "FBS rank"), h("b", {}, `#${rk}`)),
+      h("div", { class: "kpi" }, h("span", {}, "Active"), h("b", {}, c("act"))),
+      h("div", { class: "kpi" }, h("span", {}, "IR / out"), h("b", {}, c("ir") + c("sus"))),
+      h("div", { class: "kpi" }, h("span", {}, "Practice sq."), h("b", {}, c("ps")))),
+    show.length ? h("div", { style: { marginTop: "10px" } }, h("h3", {}, "Longest-tenured"),
+      show.map(x => h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", padding: "3px 0", fontSize: "13px" } },
+        h("span", {}, h("a", { href: `#/nfl/player/${x[1]}/${x[6]}` }, h("b", {}, x[0])), ` ${x[3]}`),
+        h("span", { class: "team-cell small muted" }, nt(x[1])[2] ? h("img", { class: "logo", src: nt(x[1])[2], alt: "", loading: "lazy" }) : null,
+          `${x[2]} · ${x[5] ? x[5] + " yr" + (x[5] === 1 ? "" : "s") : "rookie"}`))))
+      : h("div", { class: "muted small", style: { marginTop: "8px" } }, "No players from this program on an NFL roster right now."));
+}
+
 CFB.teamExtras = async (d, id) => {
-  const [p, r] = await Promise.all([load("cfb_portal").catch(() => null), load("cfb_recruiting").catch(() => null)]);
+  const [p, r, nfl] = await Promise.all([load("cfb_portal").catch(() => null), load("cfb_recruiting").catch(() => null), load("cfb_nfl").catch(() => null)]);
   const out = [];
+  if (nfl) out.push(nflCard(d, nfl, id));
   const dis = d.disappoint.find(x => x.id === id);
   if (dis) out.push(h("div", { class: "card" }, h("h2", {}, "Expectation check"),
     h("div", { class: "kpis", style: { marginTop: 0 } },
