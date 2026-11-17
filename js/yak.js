@@ -24,8 +24,72 @@ Yak.view = async () => {
   };
   const pic = (x, size, cls = "") => x?.img ? h("img", { class: "yak-logo " + cls + (x.round ? " round" : ""), src: x.img, alt: "", loading: "lazy", style: { width: size + "px", height: size + "px" } })
                                            : h("span", { class: "yak-logo ph " + cls, style: { width: size + "px", height: size + "px" } }, (x?.name || "?").split(" ").map(w => w[0]).slice(0, 2).join(""));
+  /* ---- live scores (ESPN, in the browser): team sports via the homepage's liveScores(), UFC per fight ---- */
+  let live = {};
+  const liveKey = p => `${p.sport}|${p.gid}`;
+  const ufcLive = async ps => {
+    const out = {}, days = [...new Set(ps.map(p => new Date(p.date).toLocaleDateString("en-CA", { timeZone: "America/New_York" }).replace(/-/g, "")))];
+    await Promise.all(days.map(async day => {
+      try {
+        const j = await (await fetch(`https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard?dates=${day}`)).json();
+        for (const e of j.events || []) for (const c of e.competitions || []) {
+          const st = c.status?.type || {}, cs = (c.competitors || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+          out[c.id] = { state: st.state, detail: st.shortDetail || st.detail, ids: cs.map(x => String(x.id)), winner: cs.findIndex(x => x.winner) };
+        }
+      } catch { /* keep the locked view */ }
+    }));
+    return out;
+  };
+  const refreshLive = async () => {
+    const c = d.cards[day];
+    const ps = c ? c.sharp.concat(c.lotto).filter(p => !p.result && new Date(p.date) <= Date.now() + 15 * 6e4) : [];
+    if (!ps.length) return false;
+    const team = ps.filter(p => p.sport !== "ufc"), ufc = ps.filter(p => p.sport === "ufc");
+    const [a, b] = await Promise.all([team.length ? liveScores(team.map(p => ({ sport: p.sport, id: p.gid, date: p.date }))) : {}, ufc.length ? ufcLive(ufc) : {}]);
+    const next = {};
+    for (const p of team) if (a[p.gid]) next[liveKey(p)] = a[p.gid];
+    for (const p of ufc) if (b[p.gid]) next[liveKey(p)] = b[p.gid];
+    live = next;
+    return ps.some(p => (next[liveKey(p)] || {}).state === "in" || new Date(p.date) > Date.now());
+  };
+  /* where the pick stands right now: score, and whether it's covering / leading / on pace */
+  const liveInfo = p => {
+    const L = live[liveKey(p)];
+    if (!L || L.state === "pre") return null;
+    const fin = L.state === "post";
+    if (p.sport === "ufc") {
+      if (!fin) return { text: `🔴 ${L.detail || "Live"}`, cls: "warn" };
+      if (L.winner < 0) return { text: `Final · ${L.detail || ""}`, cls: "" };
+      const ourIdx = p.side === "away" ? 0 : 1;           // fighter a = first listed = our "away"
+      const won = L.winner === ourIdx;
+      return { text: `Final · ${won ? "won" : "lost"} (grading at next update)`, cls: won ? "good" : "bad", res: won ? "W" : "L" };
+    }
+    const hs = +L.hs, as = +L.as;
+    if (isNaN(hs) || isNaN(as)) return null;
+    const score = `${p.away} ${as} - ${p.home} ${hs}`;
+    let edge, label;
+    if (p.market === "total") {
+      const t = hs + as; edge = (t - p.line) * (p.side === "over" ? 1 : -1);
+      label = fin ? `${t} total` : `${t} so far, line ${p.line}`;
+    } else {
+      const m = p.side === "home" ? hs - as : as - hs;
+      edge = p.market === "spread" ? m + p.line : m;
+      const who = p.side === "home" ? p.home : p.away;
+      label = p.market === "spread" ? `${who} ${edge > 0 ? "covering" : edge < 0 ? "not covering" : "on the number"}${edge ? ` by ${Math.abs(edge)}` : ""}`
+                                    : `${who} ${m > 0 ? "leading" : m < 0 ? "trailing" : "tied"}`;
+    }
+    if (fin) {
+      const res = edge > 0 ? "W" : edge < 0 ? "L" : "P";
+      return { text: `Final: ${score} · ${res === "W" ? "won" : res === "L" ? "lost" : "push"} (grading at next update)`, cls: res === "W" ? "good" : res === "L" ? "bad" : "", res };
+    }
+    return { text: `🔴 ${L.detail} · ${score} · ${label}`, cls: p.market === "total" && !fin ? "" : edge > 0 ? "good" : edge < 0 ? "bad" : "" };
+  };
+  const liveRow = p => { const i = liveInfo(p); return i ? h("div", { class: `yak-live ${i.cls}` }, i.text) : null; };
   const status = p => {
     if (p.result) return null;
+    const li = liveInfo(p);
+    if (li?.res) return h("span", { class: `chip ${li.res === "W" ? "good" : li.res === "L" ? "bad" : ""}` }, li.res === "W" ? "Won*" : li.res === "L" ? "Lost*" : "Push*");
+    if (li) return h("span", { class: "chip warn" }, h("span", { class: "live-dot" }), "Live");
     const ms = new Date(p.date) - Date.now();
     if (ms <= 0) return h("span", { class: "chip warn" }, h("span", { class: "live-dot" }), "In progress");
     const hr = Math.floor(ms / 36e5), mn = Math.round((ms % 36e5) / 6e4);
@@ -51,6 +115,7 @@ Yak.view = async () => {
           h("b", { class: "yak-name" }, p.pick), h("span", { class: "mono yak-odds" }, fmtML(p.odds)), resChip(p), status(p)),
         h("div", { class: "small muted yak-game" }, pic(s.A, 16), ` ${p.away} ${p.sport === "ufc" ? "vs" : "@"} `, pic(s.H, 16), ` ${p.home} · ${fmt.date(p.date)} ${fmt.time(p.date)}`,
           p.final ? ` · Final: ${p.final}` : "", p.clv != null ? ` · CLV ${fmt.sgn(p.clv, 1)}${p.market === "ml" ? " pts" : ""}` : ""),
+        liveRow(p),
         h("div", { class: "small yak-why" }, p.why.join(" · "))));
   };
   const spotlight = p => {
@@ -62,7 +127,7 @@ Yak.view = async () => {
         h("div", { style: { minWidth: 0 } },
           h("div", { class: "yak-spot-pick" }, p.pick, h("span", { class: "mono" }, ` ${fmtML(p.odds)}`)),
           h("div", { class: "small muted" }, `${p.away} ${p.sport === "ufc" ? "vs" : "@"} ${p.home} · ${SP[p.sport]} · ${fmt.date(p.date)} ${fmt.time(p.date)}`),
-          h("div", { style: { marginTop: "6px", display: "flex", gap: "6px", flexWrap: "wrap" } }, resChip(p), status(p)))),
+          h("div", { style: { marginTop: "6px", display: "flex", gap: "6px", flexWrap: "wrap" } }, resChip(p), status(p)), liveRow(p))),
       h("div", { class: "small yak-why", style: { marginTop: "8px" } }, p.why.join(" · ")));
   };
   const stats = ps => {
@@ -153,6 +218,16 @@ Yak.view = async () => {
     }
   };
   draw();
+  const here = stillOn();
+  clearInterval(Yak._timer);
+  const tick = async () => {
+    if (!here()) return clearInterval(Yak._timer);
+    const more = await refreshLive();
+    if (here() && view === "card") draw();
+    if (!more) clearInterval(Yak._timer);
+  };
+  tick();
+  Yak._timer = setInterval(tick, 60000);
   mount(
     h("h1", {}, "YAK's Sharp Picks"),
     h("p", { class: "lede" }, "A daily card built from where the money is going: DraftKings' betting splits (money share well ahead of ticket share), the multi-book consensus where it exists, line movement since the open, and our models. ",

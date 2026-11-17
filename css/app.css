@@ -523,3 +523,8 @@ a.osu-pl:hover { border-color: var(--accent); }
   .yak-pick { grid-template-columns: 44px auto minmax(0, 1fr); gap: 9px; }
   .yak-spot-pick { font-size: 20px; }
 }
+
+.yak-live { margin-top: 4px; font-size: 12.5px; font-weight: 700; padding: 4px 8px; border-radius: 7px; background: var(--panel2); display: inline-block; }
+.yak-live.good { color: var(--good); background: color-mix(in srgb, var(--good) 12%, var(--panel2)); }
+.yak-live.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--panel2)); }
+.yak-live.warn { color: var(--warn); }
