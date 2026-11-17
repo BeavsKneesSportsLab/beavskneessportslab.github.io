@@ -46,7 +46,9 @@ const Search = {
         else if (k.split(/[\s.'-]+/).some(w => w.startsWith(q))) best = Math.max(best, 40);
         else if (k.includes(q)) best = Math.max(best, 15);
       }
-      return best ? best + (x.kind === "team" ? 8 : x.kind === "page" ? 5 : 0) + (x.sport === "cfb" ? 2 : 0) : 0;
+      // teams first, then pages; CFB teams get a nudge (the home sport); among equal player matches, pros before college
+      return best ? best + (x.kind === "team" ? 8 + (x.sport === "cfb" ? 2 : 0) : x.kind === "page" ? 5 : 0)
+                  + ((x.kind === "player" || x.kind === "fighter") && !isCollege(x.sport) ? 1 : 0) : 0;
     };
     return idx.map(x => [score(x), x]).filter(([s]) => s).sort((a, b) => b[0] - a[0]).slice(0, 14).map(([, x]) => x);
   },
