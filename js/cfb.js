@@ -315,7 +315,7 @@ CFB.heisman = async () => {
     h("div", { class: "grid g3" }, rows.slice(0, 3).map((c, i) => h("div", { class: "card heis" + (i === 0 ? " first" : "") },
       h("div", { class: "kicker" }, ["Front-runner", "2nd", "3rd"][i]),
       who(c),
-      h("div", { class: "heis-odds" }, fmt.pct(c.market)), h("div", { class: "small muted" }, `market · our model ${fmt.pct(c.model)} (#${c.modelRank ?? "–"})`),
+      h("div", { class: "heis-odds" }, fmt.pct(c.market)), h("div", { class: "small muted" }, `${c.odds != null ? fmtML(c.odds) + " · " : ""}market · our model ${fmt.pct(c.model)} (#${c.modelRank ?? "–"})`),
       h("div", { class: "small", style: { marginTop: "6px" } }, c.line)))),
     h("div", { class: "card tight", style: { marginTop: "16px" } },
       h("div", { class: "card-head" }, h("h2", {}, "The race"), h("span", { class: "muted small" }, "Market as of ", H.asOf, " · ", h("a", { class: "link", href: H.sourceUrl, target: "_blank", rel: "noopener" }, "source"))),
@@ -323,7 +323,7 @@ CFB.heisman = async () => {
         { k: "who", label: "Player", sort: c => c.name, asc: true, fmt: who },
         { k: "line", label: "Season", nosort: true, cls: "wrap", fmt: c => h("span", { class: "small" }, c.line, c.out ? h("span", { class: "chip bad", style: { marginLeft: "6px" } }, "Out") : null) },
         { k: "market", label: "Market", num: true, fmt: c => h("div", { style: { display: "flex", gap: "8px", alignItems: "center", justifyContent: "flex-end" } },
-            h("div", { class: "bar", style: { width: "70px" } }, h("i", { style: { width: `${100 * c.market / mx}%` } })), h("b", {}, fmt.pct(c.market, 1))) },
+            h("div", { class: "bar", style: { width: "70px" } }, h("i", { style: { width: `${100 * c.market / mx}%` } })), h("b", {}, fmt.pct(c.market, 1)), c.odds != null ? h("span", { class: "mono small muted" }, fmtML(c.odds)) : null) },
         { k: "model", label: "Our model", num: true, title: "Our model's vote share", fmt: c => fmt.pct(c.model, 1) },
         { k: "modelRank", label: "Model #", num: true, asc: true },
       ], rows, { sort: "market" })),
@@ -335,7 +335,7 @@ CFB.heisman = async () => {
         { k: "line", label: "Season", nosort: true, cls: "wrap", fmt: c => h("span", { class: "small" }, c.line) },
         { k: "model", label: "Model share", num: true, fmt: c => fmt.pct(c.model, 1) },
       ], sl, { sort: "modelRank", asc: true })),
-    h("div", { class: "note" }, H.source + ". Market numbers are refreshed weekly; between refreshes they can lag a big Saturday."));
+    h("div", { class: "note" }, H.source + (/DraftKings/.test(H.source) ? ". Live DraftKings odds, refreshed with every site build." : ". This is a dated snapshot (the live odds feed was unavailable at the last build).")));
 };
 
 
