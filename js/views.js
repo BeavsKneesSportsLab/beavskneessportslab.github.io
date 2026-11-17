@@ -211,7 +211,7 @@ function moveLine(m, H, goals) {            // opening line -> current line
   return parts.length ? h("div", { class: "mkt-cmp" }, "Opened: ", parts.join(" · ")) : null;
 }
 function splitsLine(m, H, A, sport) {              // share of bets vs share of money, home side / over
-  const s = m.splits; if (!s) return null;
+  const s = m.dk || m.splits; if (!s) return null;
   const items = [];
   if (s.spread_home_bets != null) items.push([`Spread`, s.spread_home_bets, s.spread_home_handle, `on ${H.abbr}`]);
   else if (s.ml_home_bets != null) items.push([`ML`, s.ml_home_bets, s.ml_home_handle, `on ${H.abbr}`]);
@@ -707,8 +707,10 @@ function draftCard(d, rows) {
 Views.splits = async (sport) => {
   const d = await sportData(sport);
   const goals = sport === "nhl" || sport === "mlb";
-  const games = d.predictions.filter(g => g.mkt?.splits && g.state !== "post").map(g => {
-    const s = g.mkt.splits, H = team(d, g.home), A = team(d, g.away), m = g.mkt;
+  const hasDk = d.predictions.some(g => g.mkt?.dk), hasSbd = d.predictions.some(g => g.mkt?.splits);
+  let src = hasDk ? "dk" : "sbd";
+  const build = () => d.predictions.filter(g => (src === "dk" ? g.mkt?.dk : g.mkt?.splits) && g.state !== "post").map(g => {
+    const s = src === "dk" ? g.mkt.dk : g.mkt.splits, H = team(d, g.home), A = team(d, g.away), m = g.mkt;
     const mk = [];
     if (s.ml_home_bets != null) mk.push({ k: "ml", label: "Moneyline", sides: [[A, m.mlA != null ? fmtML(m.mlA) : ""], [H, m.mlH != null ? fmtML(m.mlH) : ""]], bets: 100 - s.ml_home_bets, money: s.ml_home_handle != null ? 100 - s.ml_home_handle : null });
     if (s.spread_home_bets != null) mk.push({ k: "spread", label: sport === "nhl" ? "Puck line" : sport === "mlb" ? "Run line" : "Spread",
@@ -716,14 +718,21 @@ Views.splits = async (sport) => {
     if (s.over_bets != null) mk.push({ k: "total", label: "Total", sides: [[{ abbr: "Over" }, m.total != null ? `o${m.total}` : ""], [{ abbr: "Under" }, m.total != null ? `u${m.total}` : ""]], bets: s.over_bets, money: s.over_handle ?? null });
     for (const x of mk) x.gap = x.money == null ? null : x.money - x.bets;      // + = money leans to the LEFT side more than tickets do
     const top = mk.filter(x => x.gap != null).sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap))[0];
-    return { g, H, A, m, mk, top, gap: top ? Math.abs(top.gap) : 0, upd: s.splits_updated };
+    return { g, H, A, m, mk, top, gap: top ? Math.abs(top.gap) : 0, upd: s.splits_updated || s.updated };
   });
+  let games = build();
   let sort = "gap", only = "";
   const list = h("div");
   const bar = (left, cls) => h("div", { class: "spl-bar " + cls },
     h("i", { style: { width: `${left}%` } }),
     h("span", { class: "l" }, `${Math.round(left)}%`), h("span", { class: "r" }, `${100 - Math.round(left)}%`));
-  const mkRow = (x) => {
+  const agree = (r, x) => {
+    const c = r.m.splitsCheck?.[x.k];
+    if (c == null) return null;
+    return c < 15 ? h("span", { class: "chip good", title: `DraftKings and the multi-book consensus are within ${c} points on bets and money` }, "✓ sources agree")
+                  : h("span", { class: "chip bad", title: "DraftKings' own customers vs the multi-book consensus: largest gap in bets or money share" }, `⚠ sources differ by ${c} pts`);
+  };
+  const mkRow = (x, r) => {
     const sharpSide = x.gap == null || Math.abs(x.gap) < 10 ? null : x.gap > 0 ? 0 : 1;
     const sideLbl = i => h("div", { class: "spl-side" + (i ? " r" : "") + (sharpSide === i ? " sharp" : "") },
       x.sides[i][0].logo ? logo(x.sides[i][0]) : null, h("b", {}, x.sides[i][0].abbr || x.sides[i][0].short), h("span", { class: "mono small muted" }, ` ${x.sides[i][1]}`));
@@ -732,32 +741,44 @@ Views.splits = async (sport) => {
       h("div", { class: "spl-rows" },
         h("div", { class: "spl-row" }, h("span", { class: "small muted" }, "Bets"), bar(x.bets, "bets")),
         x.money != null ? h("div", { class: "spl-row" }, h("span", { class: "small muted" }, "Money"), bar(x.money, "money")) : null),
-      sharpSide != null ? h("div", { class: "small", style: { marginTop: "4px" } },
-        h("span", { class: "chip warn" }, `💰 ${Math.abs(Math.round(x.gap))} pts more money than tickets on ${x.sides[sharpSide][0].abbr || x.sides[sharpSide][0].short}`)) : null);
+      h("div", { class: "small", style: { marginTop: "4px", display: "flex", gap: "6px", flexWrap: "wrap" } },
+        sharpSide != null ? h("span", { class: "chip warn" }, `💰 ${Math.abs(Math.round(x.gap))} pts more money than tickets on ${x.sides[sharpSide][0].abbr || x.sides[sharpSide][0].short}`) : null,
+        agree(r, x)));
   };
   const card = r => h("div", { class: "card spl-card" },
     h("div", { class: "card-head", style: { marginBottom: "6px" } },
       h("div", { class: "team-cell" }, logo(r.A), h("b", {}, r.A.short || r.A.name), h("span", { class: "muted" }, " @ "), logo(r.H), h("b", {}, r.H.short || r.H.name)),
       h("span", { class: "muted small" }, `${fmt.date(r.g.date)} · ${fmt.time(r.g.date)}`)),
     r.m.open ? moveLine(r.m, r.H, goals) : null,
-    r.mk.filter(x => !only || x.k === only).map(mkRow));
+    r.mk.filter(x => !only || x.k === only).map(x => mkRow(x, r)));
   const draw = () => {
     let rs = games.filter(r => !only || r.mk.some(x => x.k === only));
     rs = sort === "gap" ? rs.slice().sort((a, b) => (only ? Math.abs(b.mk.find(x => x.k === only)?.gap ?? 0) - Math.abs(a.mk.find(x => x.k === only)?.gap ?? 0) : b.gap - a.gap))
                         : rs.slice().sort((a, b) => a.g.date.localeCompare(b.g.date));
     list.replaceChildren(...(rs.length ? [h("div", { class: "grid g2" }, rs.map(card))] : [h("div", { class: "card empty" }, "No public splits posted for upcoming games right now. They appear once books open lines (usually a day or two out).")]));
+    stamp.textContent = (() => { const u = games.map(r => r.upd).filter(Boolean).sort().pop(); return u ? `Splits updated ${fmt.ago(u)}.` : ""; })();
   };
+  const stamp = h("span", { class: "muted small" });
   draw();
-  const upd = games.map(r => r.upd).filter(Boolean).sort().pop();
+  const nChk = d.predictions.reduce((n, g) => n + Object.keys(g.mkt?.splitsCheck || {}).length, 0);
+  const nAgree = d.predictions.reduce((n, g) => n + Object.values(g.mkt?.splitsCheck || {}).filter(v => v < 15).length, 0);
   mount(
     h("h1", {}, `${SPORTS[sport].name} Betting Splits`),
     h("p", { class: "lede" }, "For every upcoming game: what share of ", h("b", {}, "bets"), " (tickets) and what share of ", h("b", {}, "money"),
       " (handle) is on each side of the moneyline, ", sport === "nhl" ? "puck line" : sport === "mlb" ? "run line" : "spread", " and total. ",
       "When the money share runs well ahead of the ticket share, fewer but bigger bets are on that side - the classic \"sharp money\" tell (flagged at 10+ points). It's a hint about who is betting, not a guarantee of who wins."),
     h("div", { class: "toolbar" },
+      hasDk && hasSbd ? seg([["dk", "DraftKings"], ["sbd", "Multi-book consensus"]], src, v => { src = v; games = build(); draw(); }) : null,
       seg([["gap", "Biggest money ≠ tickets"], ["time", "Game time"]], sort, v => { sort = v; draw(); }),
       seg([["", "All markets"], ["ml", "Moneyline"], ["spread", sport === "nhl" ? "Puck line" : sport === "mlb" ? "Run line" : "Spread"], ["total", "Total"]], only, v => { only = v; draw(); })),
+    nChk ? h("div", { class: "note", style: { marginTop: 0, marginBottom: "12px" } },
+      `Cross-check: on ${nChk} markets with both sources, DraftKings and the multi-book consensus agree within 15 points on ${nAgree} (${Math.round(100 * nAgree / nChk)}%). `,
+      "They measure different bettor pools, so some gap is normal; a big one means treat that market's split with suspicion.") : null,
+    h("div", { style: { margin: "-4px 0 10px" } }, stamp),
     list,
-    h("div", { class: "note" }, `Public splits from SportsBettingDime's consensus feed (multiple US books), refreshed with each site build${upd ? `; latest update ${fmt.ago(upd)}` : ""}. `,
+    h("div", { class: "note" }, "Sources: DraftKings' own public splits page (its customers only; ",
+      isCollege(sport) ? "the 50 most-bet college games each week" : "every game it lists", ") and ",
+      isCollege(sport) ? "no second source for college (SportsBettingDime's consensus feed covers pro leagues only). " : "SportsBettingDime's multi-book consensus feed. ",
+      "Each is matched to the game on both teams and the start time, and splits more than 12 hours old are dropped. Refreshed with each site build. ",
       "Books don't publish dollar amounts per game, so these are shares, not totals. Lines shown are DraftKings."));
 };
