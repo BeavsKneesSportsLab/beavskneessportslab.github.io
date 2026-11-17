@@ -14,7 +14,7 @@ const SPORTS = {
          tabs: [["cards", "Fight Cards"], ["results", "Results"], ["rankings", "Rankings"], ["elo", "Fighter Ratings"], ["ufcmarket", "Model vs Market"]] },
 };
 const defaultTab = k => k === "cfb" ? "ratings" : k === "ufc" ? "cards" : "predictions";
-const PRO_TABS = [["ratings", "Power Ratings"], ["predictions", "Predictions"], ["projections", "Season Odds"], ["record", "Model vs Market"], ["standings", "Standings"], ["hunt", "Playoff Hunt"],
+const PRO_TABS = [["ratings", "Power Ratings"], ["predictions", "Predictions"], ["projections", "Season Odds"], ["record", "Model vs Market"], ["splits", "Betting Splits"], ["standings", "Standings"], ["hunt", "Playoff Hunt"],
                   ["rumors", "Trade Rumors"], ["trade", "Trade Simulator"], ["sim", "Game Sim"], ["teams", "Teams"], ["board", "Message Board"]];
 for (const k of ["nfl", "nba", "mlb", "nhl"]) SPORTS[k].tabs = k === "mlb"
   ? PRO_TABS.map(([t, l]) => t === "projections" ? ["hotstove", "Hot Stove"] : [t, l]) : PRO_TABS;

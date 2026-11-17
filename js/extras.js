@@ -9,7 +9,7 @@ const PAGES = [
   ["Recruiting", "#/cfb/recruiting", "CFB"], ["NFL Pipeline", "#/cfb/nflpipe", "CFB · NFL players per school"],
   ["UFC Fight Cards", "#/ufc/cards", "UFC"], ["UFC Results", "#/ufc/results", "UFC"], ["UFC Rankings", "#/ufc/rankings", "UFC"], ["UFC Fighter Ratings", "#/ufc/elo", "UFC · Elo"], ["UFC Model vs Market", "#/ufc/ufcmarket", "UFC"],
   ...Object.entries(SPORTS).filter(([, s]) => !s.noTeams).flatMap(([k, s]) => [[`${s.name} Power Ratings`, `#/${k}/ratings`, s.full], [`${s.name} Predictions`, `#/${k}/predictions`, s.full],
-    [`${s.name} Standings`, `#/${k}/standings`, s.full], ...(s.tabs.some(([t]) => t === "hunt") ? [[`${s.name} Playoff Hunt`, `#/${k}/hunt`, s.full]] : [])]),
+    [`${s.name} Standings`, `#/${k}/standings`, s.full], ...(s.tabs.some(([t]) => t === "hunt") ? [[`${s.name} Playoff Hunt`, `#/${k}/hunt`, s.full]] : []), ...(s.tabs.some(([t]) => t === "splits") ? [[`${s.name} Betting Splits`, `#/${k}/splits`, `${s.full} · % of bets vs money`]] : [])]),
 ];
 const Search = {
   _idx: null,
