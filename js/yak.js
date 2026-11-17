@@ -6,20 +6,65 @@ Yak.view = async () => {
   if (!d || !Object.keys(d.cards || {}).length)
     return mount(h("h1", {}, "YAK's Sharp Picks"), h("div", { class: "card empty" }, "The first card locks at the next morning build. Check back soon."));
   const days = Object.keys(d.cards).sort().reverse();
+  // logos: picks carry team / fighter ids (older ones are looked up in each sport's games by game id)
+  const sports = [...new Set(Object.values(d.cards).flatMap(c => c.sharp.concat(c.lotto).map(p => p.sport)))];
+  const SD = {}, UFCD = sports.includes("ufc") ? await load("ufc").catch(() => null) : null;
+  await Promise.all(sports.filter(x => x !== "ufc").map(async x => { SD[x] = await sportData(x).catch(() => null); }));
+  const sides = p => {
+    if (p.sport === "ufc") {
+      const f = UFCD && (UFCD.upcoming.concat(UFCD.recent).flatMap(e => e.fights).find(x => x.id === p.gid));
+      const A = UFCD?.fighters[p.awayId || f?.a] || {}, H = UFCD?.fighters[p.homeId || f?.b] || {};
+      return { A: { img: A.img, name: p.away, round: true }, H: { img: H.img, name: p.home, round: true } };
+    }
+    const sd = SD[p.sport];
+    let aId = p.awayId, hId = p.homeId;
+    if (sd && !hId) { const g = sd.predictions.concat(sd.schedule || [], sd.recent || []).find(x => x.id === p.gid); if (g) { aId = g.away; hId = g.home; } }
+    const A = sd && aId ? team(sd, aId) : {}, H = sd && hId ? team(sd, hId) : {};
+    return { A: { img: A.logo, name: p.away, color: A.color }, H: { img: H.logo, name: p.home, color: H.color } };
+  };
+  const pic = (x, size, cls = "") => x?.img ? h("img", { class: "yak-logo " + cls + (x.round ? " round" : ""), src: x.img, alt: "", loading: "lazy", style: { width: size + "px", height: size + "px" } })
+                                           : h("span", { class: "yak-logo ph " + cls, style: { width: size + "px", height: size + "px" } }, (x?.name || "?").split(" ").map(w => w[0]).slice(0, 2).join(""));
+  const status = p => {
+    if (p.result) return null;
+    const ms = new Date(p.date) - Date.now();
+    if (ms <= 0) return h("span", { class: "chip warn" }, h("span", { class: "live-dot" }), "In progress");
+    const hr = Math.floor(ms / 36e5), mn = Math.round((ms % 36e5) / 6e4);
+    return h("span", { class: "chip" }, hr >= 20 ? fmt.time(p.date) : `Starts in ${hr ? hr + "h " : ""}${mn}m`);
+  };
   let day = days[0], view = "card";
   const body = h("div");
   const SP = { nfl: "NFL", nba: "NBA", nhl: "NHL", mlb: "MLB", cfb: "CFB", cbb: "CBB", ufc: "UFC" };
   const resChip = p => p.result ? h("span", { class: `chip ${p.result === "W" ? "good" : p.result === "L" ? "bad" : ""}` },
-      `${p.result === "W" ? "Won" : p.result === "L" ? "Lost" : "Push"} ${fmt.sgn(p.profit, 2)}u`) : h("span", { class: "chip" }, "Pending");
-  const pickRow = (p, lotto) => h("div", { class: "yak-pick" + (lotto ? " lotto" : "") },
-    h("div", { class: "yak-u" + (lotto ? " l" : ` u${p.units}`) }, lotto ? "¼U" : `${p.units}U`),
-    h("div", { class: "yak-main" },
-      h("div", { class: "yak-top" },
-        h("span", { class: "chip league" }, SP[p.sport] || p.sport),
-        h("b", { class: "yak-name" }, p.pick), h("span", { class: "mono yak-odds" }, fmtML(p.odds)), resChip(p)),
-      h("div", { class: "small muted" }, `${p.away} ${p.sport === "ufc" ? "vs" : "@"} ${p.home} · ${fmt.date(p.date)} ${fmt.time(p.date)}`,
-        p.final ? ` · Final: ${p.final}` : "", p.clv != null ? ` · CLV ${fmt.sgn(p.clv, 1)}${p.market === "ml" ? " pts" : ""}` : ""),
-      h("div", { class: "small yak-why" }, p.why.join(" · "))));
+      `${p.result === "W" ? "Won" : p.result === "L" ? "Lost" : "Push"} ${fmt.sgn(p.profit, 2)}u`) : null;   // ungraded picks show status() instead
+  const hero = (p, s) => p.market === "total"
+    ? h("div", { class: "yak-pair" }, pic(s.A, 30, "a"), pic(s.H, 30, "b"))
+    : pic(p.side === "home" ? s.H : s.A, 44);
+  const pickRow = (p, lotto) => {
+    const s = sides(p), mine = p.market === "total" ? null : (p.side === "home" ? s.H : s.A);
+    return h("div", { class: "yak-pick" + (lotto ? " lotto" : "") + (p.result ? ` r-${p.result}` : ""),
+                      style: mine?.color ? `--team:${mine.color}` : null },
+      h("div", { class: "yak-u" + (lotto ? " l" : ` u${p.units}`) }, lotto ? "¼U" : `${p.units}U`),
+      hero(p, s),
+      h("div", { class: "yak-main" },
+        h("div", { class: "yak-top" },
+          h("span", { class: "chip league" }, SP[p.sport] || p.sport),
+          h("b", { class: "yak-name" }, p.pick), h("span", { class: "mono yak-odds" }, fmtML(p.odds)), resChip(p), status(p)),
+        h("div", { class: "small muted yak-game" }, pic(s.A, 16), ` ${p.away} ${p.sport === "ufc" ? "vs" : "@"} `, pic(s.H, 16), ` ${p.home} · ${fmt.date(p.date)} ${fmt.time(p.date)}`,
+          p.final ? ` · Final: ${p.final}` : "", p.clv != null ? ` · CLV ${fmt.sgn(p.clv, 1)}${p.market === "ml" ? " pts" : ""}` : ""),
+        h("div", { class: "small yak-why" }, p.why.join(" · "))));
+  };
+  const spotlight = p => {
+    const s = sides(p), mine = p.market === "total" ? null : (p.side === "home" ? s.H : s.A);
+    return h("div", { class: "yak-spot", style: mine?.color ? `--team:${mine.color}` : null },
+      h("div", { class: "yak-spot-tag" }, "⭐ YAK's Best Bet · 5U"),
+      h("div", { class: "yak-spot-row" },
+        p.market === "total" ? h("div", { class: "yak-pair big" }, pic(s.A, 54, "a"), pic(s.H, 54, "b")) : pic(mine, 72),
+        h("div", { style: { minWidth: 0 } },
+          h("div", { class: "yak-spot-pick" }, p.pick, h("span", { class: "mono" }, ` ${fmtML(p.odds)}`)),
+          h("div", { class: "small muted" }, `${p.away} ${p.sport === "ufc" ? "vs" : "@"} ${p.home} · ${SP[p.sport]} · ${fmt.date(p.date)} ${fmt.time(p.date)}`),
+          h("div", { style: { marginTop: "6px", display: "flex", gap: "6px", flexWrap: "wrap" } }, resChip(p), status(p)))),
+      h("div", { class: "small yak-why", style: { marginTop: "8px" } }, p.why.join(" · ")));
+  };
   const stats = ps => {
     const g = ps.filter(p => p.result);
     const w = g.filter(p => p.result === "W").length, l = g.filter(p => p.result === "L").length, pu = g.filter(p => p.result === "P").length;
@@ -61,13 +106,28 @@ Yak.view = async () => {
     if (view === "card") {
       const c = d.cards[day];
       const risk = c.sharp.reduce((s, p) => s + p.units, 0);
+      const ds = stats(c.sharp), dl = stats(c.lotto), at = stats(all("sharp").concat(all("lotto")));
+      const best = c.sharp.find(p => p.units === 5);
+      let streak = 0, st = null;
+      for (const p of all("sharp").filter(p => p.result && p.result !== "P").sort((a, b) => b.date.localeCompare(a.date))) {
+        if (st === null) st = p.result; if (p.result !== st) break; streak++;
+      }
+      const tile = (lab, val, cls) => h("div", { class: "yak-tile" }, h("span", {}, lab), h("b", { class: cls || "" }, val));
       body.replaceChildren(
         h("div", { class: "toolbar" }, h("select", { class: "in", onchange: e => { day = e.target.value; draw(); } },
           days.map(x => h("option", { value: x, selected: x === day }, new Date(x + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })))),
           h("span", { class: "muted small" }, `Locked ${fmt.time(c.lockedAt)} · prices are what was available at lock`)),
+        h("div", { class: "yak-hero" },
+          tile("Today's plays", `${c.sharp.length} + ${c.lotto.length} 🎟️`),
+          tile("Units risked", `${risk + c.lotto.length * 0.25}U`),
+          tile("Today so far", ds.n + dl.n ? `${ds.w + dl.w}-${ds.l + dl.l}${ds.pu + dl.pu ? "-" + (ds.pu + dl.pu) : ""}` : "–"),
+          tile("Today's units", ds.n + dl.n ? `${fmt.sgn(ds.prof + dl.prof, 2)}u` : "–", ds.prof + dl.prof > 0 ? "pos" : ds.prof + dl.prof < 0 ? "neg" : ""),
+          tile("All-time", at.n ? `${fmt.sgn(at.prof, 2)}u` : "–", at.prof > 0 ? "pos" : at.prof < 0 ? "neg" : ""),
+          tile("Sharp streak", streak ? `${st === "W" ? "🔥" : "🧊"} ${streak}${st}` : "–")),
+        best ? spotlight(best) : null,
         h("div", { class: "card" },
           h("div", { class: "card-head" }, h("h2", {}, "🔪 YAK's Sharp Picks"), h("span", { class: "muted small" }, `${c.sharp.length} plays · ${risk}U risked`)),
-          c.sharp.length ? c.sharp.map(p => pickRow(p, false)) : h("div", { class: "muted" }, "No sharp plays qualified today.")),
+          c.sharp.length ? c.sharp.filter(p => p !== best).map(p => pickRow(p, false)) : h("div", { class: "muted" }, "No sharp plays qualified today.")),
         h("div", { class: "card", style: { marginTop: "16px" } },
           h("div", { class: "card-head" }, h("h2", {}, "🎟️ YAK's Lottos"), h("span", { class: "muted small" }, `${c.lotto.length} plays · ${fmt.n(c.lotto.length * 0.25, 2)}U risked · +750 to +4000`)),
           c.lotto.length ? c.lotto.map(p => pickRow(p, true)) : h("div", { class: "muted" }, "No long shot priced as +EV today, so none were forced.")));

@@ -497,3 +497,29 @@ a.osu-pl:hover { border-color: var(--accent); }
 .yak-name { font-size: 15.5px; }
 .yak-odds { font-weight: 700; }
 .yak-why { margin-top: 3px; color: var(--muted); }
+
+.yak-pick { grid-template-columns: 52px auto minmax(0, 1fr); border-left: 3px solid transparent; padding-left: 8px; margin-left: -11px; }
+.yak-pick[style] { border-left-color: color-mix(in srgb, var(--team) 80%, transparent); }
+.yak-pick.r-W { border-left-color: var(--good); background: color-mix(in srgb, var(--good) 6%, transparent); }
+.yak-pick.r-L { border-left-color: var(--bad); background: color-mix(in srgb, var(--bad) 5%, transparent); }
+.yak-logo { object-fit: contain; flex: none; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }
+.yak-logo.round { border-radius: 50%; object-fit: cover; object-position: top; background: var(--chip); }
+.yak-logo.ph { border-radius: 50%; background: var(--chip); color: var(--muted); font-size: 11px; font-weight: 800; }
+.yak-pair { position: relative; width: 48px; height: 44px; }
+.yak-pair .a { position: absolute; left: 0; top: 0; } .yak-pair .b { position: absolute; right: 0; bottom: 0; }
+.yak-pair.big { width: 84px; height: 72px; }
+.yak-game { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; margin-top: 2px; }
+.yak-hero { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; margin: 0 0 16px; }
+.yak-tile { background: var(--panel2); border-radius: 12px; padding: 10px 12px; }
+.yak-tile span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
+.yak-tile b { font-size: 19px; }
+.yak-spot { border-radius: 16px; padding: 16px 18px; margin-bottom: 16px; border: 1px solid var(--line);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--team, var(--accent)) 30%, var(--panel)) 0%, var(--panel) 70%); }
+.yak-spot-tag { display: inline-block; font-weight: 800; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: #fff;
+  background: var(--accent); border-radius: 999px; padding: 3px 10px; margin-bottom: 10px; }
+.yak-spot-row { display: flex; gap: 16px; align-items: center; }
+.yak-spot-pick { font-size: 24px; font-weight: 800; line-height: 1.15; }
+@media (max-width: 600px) {
+  .yak-pick { grid-template-columns: 44px auto minmax(0, 1fr); gap: 9px; }
+  .yak-spot-pick { font-size: 20px; }
+}
