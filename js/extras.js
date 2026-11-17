@@ -3,7 +3,7 @@
 
 /* ---------- search ---------- */
 const PAGES = [
-  ["Pick'em", "#/pickem", "Play against the spread"], ["Beavers", "#/beavers", "Oregon State, every sport"],
+  ["Pick'em", "#/pickem", "Play against the spread"], ["YAK's Sharp Picks", "#/yak", "Daily sharp card + Lottos, with tracker"], ["YAK's Lottos", "#/yak", "Quarter-unit long shots"], ["Beavers", "#/beavers", "Oregon State, every sport"],
   ["How it works", "#/about", "What the numbers mean"], ["Beavs Knees Poll", "#/cfb/poll", "CFB"],
   ["Playoff Odds", "#/cfb/playoff", "CFB"], ["Heisman", "#/cfb/heisman", "CFB"], ["Transfer Portal", "#/cfb/portal", "CFB"],
   ["Recruiting", "#/cfb/recruiting", "CFB"], ["NFL Pipeline", "#/cfb/nflpipe", "CFB · NFL players per school"],

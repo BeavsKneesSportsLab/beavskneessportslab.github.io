@@ -275,6 +275,7 @@ a.plink:hover { color: var(--accent); text-decoration: underline; }
 table.cmp td { font-size: 14px; } table.cmp td:first-child { text-align: right; width: 40%; } table.cmp td:last-child { width: 40%; }
 .sports a.pk-nav { color: var(--accent); }
 .sports a.pk-nav.on { background: var(--accent); color: #111; }
+@media (max-width: 1240px) { .sports a { padding: 7px 8px; } }   /* 7 sports + 3 extras fit beside the search */
 .pk-auth { margin-top: 10px; }
 .pk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
 .pk-game { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
@@ -484,3 +485,15 @@ a.osu-pl:hover { border-color: var(--accent); }
   .ufc-side + .ufc-vs + .ufc-side { border-top: 1px dashed var(--line); padding-top: 8px; }
 }
 
+
+/* ---------- YAK's picks ---------- */
+.yak-pick { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.yak-pick:first-of-type { border-top: 0; }
+.yak-u { align-self: start; text-align: center; font-weight: 800; font-size: 17px; border-radius: 10px; padding: 9px 0; background: var(--chip); }
+.yak-u.u5 { background: var(--accent); color: #fff; } .yak-u.u4 { background: color-mix(in srgb, var(--accent) 75%, var(--chip)); color: #fff; }
+.yak-u.u3 { background: color-mix(in srgb, var(--accent) 45%, var(--chip)); }
+.yak-u.l { font-size: 15px; background: color-mix(in srgb, var(--good) 22%, var(--chip)); }
+.yak-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.yak-name { font-size: 15.5px; }
+.yak-odds { font-weight: 700; }
+.yak-why { margin-top: 3px; color: var(--muted); }

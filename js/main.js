@@ -10,6 +10,7 @@ function drawNav(sport, tab) {
   $("#sportNav").replaceChildren(...Object.entries(SPORTS).map(([k, s]) =>
     h("a", { href: `#/${k}/${defaultTab(k)}`, class: k === sport ? "on" : "" }, s.name, s.featured ? h("span", { class: "star" }, "★") : null)),
     h("a", { href: "#/pickem", class: "pk-nav" + (tab === "pickem" ? " on" : "") }, "Pick'em"),
+    h("a", { href: "#/yak", class: "pk-nav" + (tab === "yak" ? " on" : "") }, "YAK's Picks"),
     h("a", { href: "#/beavers", class: "pk-nav" + (tab === "beavers" ? " on" : "") }, "🦫 Beavers"));
   $("#subNav").replaceChildren(...(sport ? SPORTS[sport].tabs.map(([k, label]) =>
     h("a", { href: `#/${sport}/${k}`, class: k === tab || (["team", "player", "compare"].includes(tab) && k === "teams") || (tab === "fighter" && k === "elo") ? "on" : "" }, label)) : []));
@@ -37,7 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
 async function route() {
   const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   const sport = SPORTS[parts[0]] ? parts[0] : null;
-  const tab = sport ? parts[1] || defaultTab(sport) : ["pickem", "beavers", "about"].includes(parts[0]) ? parts[0] : null;
+  const tab = sport ? parts[1] || defaultTab(sport) : ["pickem", "beavers", "about", "yak"].includes(parts[0]) ? parts[0] : null;
   drawNav(sport, tab);
   const meta = await load("meta").catch(() => ({}));
   const m = sport && meta[sport];
@@ -53,6 +54,7 @@ async function route() {
   $("#app").replaceChildren(h("div", { class: "loading" }, "Loading…"));
   try {
     if (tab === "pickem") await Pickem.view();
+    else if (tab === "yak") await Yak.view();
     else if (tab === "about") About.view();
     else if (tab === "beavers") await (parts[1] ? OSU.team(parts[1]) : OSU.view());
     else if (!sport) await Views.home();
