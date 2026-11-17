@@ -1,6 +1,6 @@
 /* main.js — router + nav. Routes: #/  #/{sport}/{tab}[/args...] */
 const ROUTES = {
-  ratings: s => Views.ratings(s), predictions: s => Views.predictions(s), standings: s => Views.standings(s), hunt: s => Views.hunt(s), splits: s => Views.splits(s),
+  ratings: s => Views.ratings(s), predictions: s => Views.predictions(s), standings: s => Views.standings(s), hunt: s => Views.hunt(s),
   rumors: s => Views.rumors(s), record: s => Views.record(s), player: (s, a) => Players.page(s, a), compare: (s, a) => Players.compare(s, a), hotstove: s => Players.hotStove(s), cards: (s, a) => UFC.cards(a), results: (s, a) => UFC.results(a), rankings: () => UFC.rankings(), elo: () => UFC.elo(), ufcmarket: () => UFC.market(), fighter: (s, a) => UFC.fighter(a), projections: s => Views.projections(s), board: s => Views.board(s), teams: s => Views.teams(s), team: (s, a) => Views.team(s, a[0]),
   sim: (s, a) => Sim.view(s, a), trade: (s, a) => Trade.view(s, a),
   disappoint: () => CFB.disappoint(), playoff: () => CFB.playoff(), poll: () => CFB.poll(), heisman: () => CFB.heisman(), recruiting: () => CFB.recruiting(), portal: () => CFB.portal(), nflpipe: (s, a) => CFB.nflPipe(a),
