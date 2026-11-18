@@ -1,7 +1,7 @@
 /* sim.js — Monte Carlo game simulator: any two teams, any venue, up to 100k runs, with player box-score projections.
 
 Team scoring: expected points come from the power-rating margin (incl. home edge when the venue is one team's
-home) split around a projected total built from both teams' scoring rates. Football/basketball draw team
+home) split around a projected total built from both teams' scoring rates. Football/basketball (NBA and CBB) draw team
 scores from normals (margin sd = the sport's sigma); hockey uses Poisson goals; baseball uses a gamma-Poisson
 (overdispersed) run model. Ties go to OT / extras weighted by the rating edge.
 Player lines: each player's per-game averages, scaled by how far his team's simulated score landed from its
@@ -16,6 +16,7 @@ const SIM_STATS = {
         ["rec", "Rec", 0.4, "p"], ["recYds", "Rec Yds", 0.5, "y"], ["recTD", "Rec TD", 1.0, "p"], ["tkl", "Tkl", 0, "p"], ["sacks", "Sacks", 0, "p"]],
 };
 SIM_STATS.cfb = SIM_STATS.nfl;
+SIM_STATS.cbb = SIM_STATS.nba;
 
 function rng() { return Math.random(); }
 function normal(mu, sd) { let u = 0, v = 0; while (!u) u = rng(); v = rng(); return mu + sd * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
@@ -49,6 +50,7 @@ function pickPlayers(sport, ros) {
   const has = ros.filter(p => p.sim && Object.keys(p.sim).length && !UNAVAILABLE.has(p.avail));
   const by = (k, n, f = () => true) => has.filter(f).sort((a, b) => (b.sim[k] || 0) - (a.sim[k] || 0)).slice(0, n).filter(p => p.sim[k] > 0);
   if (sport === "nba") return by("min", 10);
+  if (sport === "cbb") return by("min", 9);
   if (sport === "nhl") return has.filter(p => p.pos !== "G").sort((a, b) => (b.sim.g + b.sim.a) - (a.sim.g + a.sim.a)).slice(0, 12);
   if (sport === "mlb") return by("pa", 9);
   const seen = new Set(), out = [];
@@ -87,11 +89,11 @@ Sim.run = (sport, d, A, B, homeId, N, players) => {
     let a, b;
     if (sport === "nhl") { a = poisson(eA); b = poisson(eB); }
     else if (sport === "mlb") { a = poisson(gamma(3.5, eA / 3.5)); b = poisson(gamma(3.5, eB / 3.5)); }
-    else if (sport === "nba") { const sd = sigma / Math.SQRT2; a = Math.max(60, Math.round(normal(eA, sd))); b = Math.max(60, Math.round(normal(eB, sd))); }
+    else if (sport === "nba" || sport === "cbb") { const sd = sigma / Math.SQRT2, lo = sport === "nba" ? 60 : 35; a = Math.max(lo, Math.round(normal(eA, sd))); b = Math.max(lo, Math.round(normal(eB, sd))); }
     else { const sd = sigma / Math.SQRT2; a = footballScore(normal(eA, sd)); b = footballScore(normal(eB, sd)); }
     if (a === b) {
       ot++;
-      if (sport === "nba") { while (a === b) { a += Math.max(0, Math.round(normal(eA * 5 / 48, 3))); b += Math.max(0, Math.round(normal(eB * 5 / 48, 3))); } }
+      if (sport === "nba" || sport === "cbb") { const len = sport === "nba" ? 48 : 40; while (a === b) { a += Math.max(0, Math.round(normal(eA * 5 / len, 3))); b += Math.max(0, Math.round(normal(eB * 5 / len, 3))); } }
       else {
         const pA = sport === "nhl" ? 0.5 + (pEdge - 0.5) * 0.5 : sport === "mlb" ? 0.5 + (pEdge - 0.5) * 0.6 : pEdge;
         const add = sport === "nfl" ? 3 : sport === "cfb" ? (rng() < 0.5 ? 7 : 8) : 1;
@@ -138,7 +140,7 @@ function summarize(res) {
 }
 
 function histogram(margins, sport, left, right) {
-  const cap = { nba: 35, nfl: 35, cfb: 45, nhl: 6, mlb: 8 }[sport];
+  const cap = { nba: 35, cbb: 35, nfl: 35, cfb: 45, nhl: 6, mlb: 8 }[sport];
   const step = cap > 10 ? 2 : 1;
   const bins = new Map();
   for (const m of margins) { const v = Math.max(-cap, Math.min(cap, m)); const b = Math.round(v / step) * step; bins.set(b, (bins.get(b) || 0) + 1); }
@@ -228,7 +230,7 @@ Sim.view = async (sport, args) => {
       h("div", { class: "grid g2", style: { marginTop: "16px" } },
         h("div", { class: "card tight" }, h("div", { class: "card-head" }, h("h2", { class: "team-cell" }, logo(A), `${A.short || A.name} projected box`), h("span", { class: "muted small" }, "avg (10th–90th pct)")), boxTbl("A")),
         h("div", { class: "card tight" }, h("div", { class: "card-head" }, h("h2", { class: "team-cell" }, logo(B), `${B.short || B.name} projected box`), h("span", { class: "muted small" }, "avg (10th–90th pct)")), boxTbl("B"))),
-      h("div", { class: "note" }, "Player projections scale each player's season per-game averages by how his team's score landed in each simulation. They know nothing about injuries, matchups or minutes changes unless the roster data does."));
+      h("div", { class: "note" }, "Player projections scale each player's season per-game averages by how his team's score landed in each simulation. They know nothing about injuries, matchups or minutes changes unless the roster data does." + (sport === "cbb" ? " CBB averages blend this season (weighted 3x) with last season, matched by player, so transfers carry their old production." : "")));
   };
   const swap = () => { [aId, bId] = [bId, aId]; Sim.view(sport, [aId, bId, venue === "neutral" ? "n" : undefined]); };
   mount(
