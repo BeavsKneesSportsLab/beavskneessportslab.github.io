@@ -187,7 +187,7 @@ Yak.view = async () => {
         if (st === null) st = p.result; if (p.result !== st) break; streak++;
       }
       const tile = (lab, val, cls) => h("div", { class: "yak-tile" }, h("span", {}, lab), h("b", { class: cls || "" }, val));
-      body.replaceChildren(
+      body.replaceChildren(...[
         h("div", { class: "toolbar" }, h("select", { class: "in", onchange: e => { day = e.target.value; draw(); } },
           days.map(x => h("option", { value: x, selected: x === day }, new Date(x + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })))),
           h("span", { class: "muted small" }, leaning ? `Leans updated ${fmt.time(c.leans?.updatedAt)} · official card publishes at 1 PM PT`
@@ -207,7 +207,7 @@ Yak.view = async () => {
         leansCard,
         leaning ? null : h("div", { class: "card", style: { marginTop: "16px" } },
           h("div", { class: "card-head" }, h("h2", {}, "🎟️ YAK's Lottos"), h("span", { class: "muted small" }, `${c.lotto.length} plays · ${fmt.n(c.lotto.length * 0.25, 2)}U risked · +750 to +4000`)),
-          c.lotto.length ? c.lotto.map(p => pickRow(p, true)) : h("div", { class: "muted" }, "No long shot priced as +EV today, so none were forced.")));
+          c.lotto.length ? c.lotto.map(p => pickRow(p, true)) : h("div", { class: "muted" }, "No long shot priced as +EV today, so none were forced."))].filter(Boolean));
     } else {
       const S = all("sharp"), L = all("lotto");
       const byDay = Object.entries(days.reduce((m, dd) => (m[dd] = stats(d.cards[dd].sharp.concat(d.cards[dd].lotto)), m), {}))
