@@ -112,7 +112,8 @@ Yak.view = async () => {
       h("div", { class: "yak-main" },
         h("div", { class: "yak-top" },
           h("span", { class: "chip league" }, SP[p.sport] || p.sport),
-          h("b", { class: "yak-name" }, p.pick), h("span", { class: "mono yak-odds" }, fmtML(p.odds)), resChip(p), status(p)),
+          h("b", { class: "yak-name" }, p.pick), h("span", { class: "mono yak-odds" }, fmtML(p.odds)), resChip(p), status(p),
+          p.early ? h("span", { class: "chip", title: `Early tip: locked as an official play at ${fmt.time(p.lockedAt)}, before the 1 PM card` }, "⏰ Early lock") : null),
         h("div", { class: "small muted yak-game" }, pic(s.A, 16), ` ${p.away} ${p.sport === "ufc" ? "vs" : "@"} `, pic(s.H, 16), ` ${p.home} · ${fmt.date(p.date)} ${fmt.time(p.date)}`,
           p.final ? ` · Final: ${p.final}` : "", p.clv != null ? ` · CLV ${fmt.sgn(p.clv, 1)}${p.market === "ml" ? " pts" : ""}` : ""),
         liveRow(p),
@@ -169,10 +170,18 @@ Yak.view = async () => {
   };
   const draw = () => {
     if (view === "card") {
-      const c = d.cards[day];
+      const c = d.cards[day], leaning = c.status === "leans", LN = (leaning && c.leans) || { sharp: [], lotto: [] };
       const risk = c.sharp.reduce((s, p) => s + p.units, 0);
       const ds = stats(c.sharp), dl = stats(c.lotto), at = stats(all("sharp").concat(all("lotto")));
       const best = c.sharp.find(p => p.units === 5);
+      const leanRow = (p, lotto) => { const r = pickRow({ ...p, result: null }, lotto); r.classList.add("lean"); return r; };
+      const leansCard = leaning ? h("div", { class: "card yak-leans" },
+        h("div", { class: "card-head" }, h("h2", {}, "👀 Leans"), h("span", { class: "muted small" }, `Unofficial · refreshes every update until 1 PM PT · not tracked`)),
+        h("p", { class: "small muted", style: { margin: "0 0 8px" } }, "Where the money looks right now. Splits are thin early in the day, so these move. Units shown are where each play would land if the card published now. ",
+          "A lean on a game that tips before 1 PM locks as an official 3U play about an hour before tip."),
+        LN.sharp.length ? LN.sharp.map(p => leanRow(p, false)) : h("div", { class: "muted" }, "Nothing qualifies yet."),
+        LN.lotto.length ? h("h3", { style: { marginTop: "12px" } }, "🎟️ Lotto leans") : null,
+        LN.lotto.map(p => leanRow(p, true))) : null;
       let streak = 0, st = null;
       for (const p of all("sharp").filter(p => p.result && p.result !== "P").sort((a, b) => b.date.localeCompare(a.date))) {
         if (st === null) st = p.result; if (p.result !== st) break; streak++;
@@ -181,7 +190,8 @@ Yak.view = async () => {
       body.replaceChildren(
         h("div", { class: "toolbar" }, h("select", { class: "in", onchange: e => { day = e.target.value; draw(); } },
           days.map(x => h("option", { value: x, selected: x === day }, new Date(x + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })))),
-          h("span", { class: "muted small" }, `Locked ${fmt.time(c.lockedAt)} · prices are what was available at lock`)),
+          h("span", { class: "muted small" }, leaning ? `Leans updated ${fmt.time(c.leans?.updatedAt)} · official card publishes at 1 PM PT`
+            : `${c.status ? "Official card published" : "Locked"} ${fmt.time(c.lockedAt)} · prices are what was available at lock`)),
         h("div", { class: "yak-hero" },
           tile("Today's plays", `${c.sharp.length} + ${c.lotto.length} 🎟️`),
           tile("Units risked", `${risk + c.lotto.length * 0.25}U`),
@@ -190,10 +200,12 @@ Yak.view = async () => {
           tile("All-time", at.n ? `${fmt.sgn(at.prof, 2)}u` : "–", at.prof > 0 ? "pos" : at.prof < 0 ? "neg" : ""),
           tile("Sharp streak", streak ? `${st === "W" ? "🔥" : "🧊"} ${streak}${st}` : "–")),
         best ? spotlight(best) : null,
-        h("div", { class: "card" },
-          h("div", { class: "card-head" }, h("h2", {}, "🔪 YAK's Sharp Picks"), h("span", { class: "muted small" }, `${c.sharp.length} plays · ${risk}U risked`)),
-          c.sharp.length ? c.sharp.filter(p => p !== best).map(p => pickRow(p, false)) : h("div", { class: "muted" }, "No sharp plays qualified today.")),
-        h("div", { class: "card", style: { marginTop: "16px" } },
+        leaning && !c.sharp.length && !c.lotto.length ? null : h("div", { class: "card", style: leaning ? { marginBottom: "16px" } : null },
+          h("div", { class: "card-head" }, h("h2", {}, leaning ? "⏰ Official early plays" : "🔪 YAK's Sharp Picks"), h("span", { class: "muted small" }, `${c.sharp.length} plays · ${risk}U risked`)),
+          c.sharp.length ? c.sharp.filter(p => p !== best).map(p => pickRow(p, false)) : h("div", { class: "muted" }, leaning ? "No early sharp plays." : "No sharp plays qualified today."),
+          leaning && c.lotto.length ? c.lotto.map(p => pickRow(p, true)) : null),
+        leansCard,
+        leaning ? null : h("div", { class: "card", style: { marginTop: "16px" } },
           h("div", { class: "card-head" }, h("h2", {}, "🎟️ YAK's Lottos"), h("span", { class: "muted small" }, `${c.lotto.length} plays · ${fmt.n(c.lotto.length * 0.25, 2)}U risked · +750 to +4000`)),
           c.lotto.length ? c.lotto.map(p => pickRow(p, true)) : h("div", { class: "muted" }, "No long shot priced as +EV today, so none were forced.")));
     } else {
@@ -232,7 +244,7 @@ Yak.view = async () => {
     h("h1", {}, "YAK's Sharp Picks"),
     h("p", { class: "lede" }, "A daily card built from where the money is going: DraftKings' betting splits (money share well ahead of ticket share), the multi-book consensus where it exists, line movement since the open, and our models. ",
       "Sized 5U down to 1U by strength, plus ", h("b", {}, "YAK's Lottos"), ": quarter-unit long shots (+750 to +4000) our models price as +EV. ",
-      "Each day's card locks in the morning and every pick is graded at the price taken."),
+      "From 7 AM to 1 PM PT the page shows live ", h("b", {}, "Leans"), " (unofficial); the official card publishes at 1 PM, and plays on games that tip earlier lock as official 3U picks about an hour before tip. Every official pick is graded at the price taken."),
     h("div", { class: "toolbar" }, seg([["card", "Today's card"], ["tracker", "Tracker"]], view, v => { view = v; draw(); })),
     body,
     h("div", { class: "note" }, "How picks are chosen: a side needs DraftKings money at least 15 points ahead of tickets; it gains for the consensus agreeing, the line moving its way and our model agreeing, and loses for the line moving against it. ",

@@ -528,3 +528,6 @@ a.osu-pl:hover { border-color: var(--accent); }
 .yak-live.good { color: var(--good); background: color-mix(in srgb, var(--good) 12%, var(--panel2)); }
 .yak-live.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--panel2)); }
 .yak-live.warn { color: var(--warn); }
+.yak-leans { border-style: dashed; }
+.yak-pick.lean .yak-u { opacity: .55; }
+.yak-pick.lean .yak-name { font-weight: 600; }
