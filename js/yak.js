@@ -248,6 +248,6 @@ Yak.view = async () => {
     h("div", { class: "toolbar" }, seg([["card", "Today's card"], ["tracker", "Tracker"]], view, v => { view = v; draw(); })),
     body,
     h("div", { class: "note" }, "How picks are chosen: a side needs DraftKings money at least 15 points ahead of tickets; it gains for the consensus agreeing, the line moving its way and our model agreeing, and loses for the line moving against it. ",
-      "Thin markets, games whose own flags contradict, and moneylines outside -250 to +300 are skipped, with one pick per game. Lottos need positive expected value after our model is blended with the book's price. ",
+      "Thin markets (money above 95% or a 50/50 ticket split, usually a handful of bets), picks where the line moved against the money, picks our model says lose, games whose own flags contradict, and moneylines outside -250 to +300 are skipped, with one pick per game. Lottos need positive expected value after our model is blended with the book's price. ",
       "CLV (closing-line value) says whether we beat the final line, which shows real edge long before win-loss does. For fun and analysis, not betting advice."));
 };
