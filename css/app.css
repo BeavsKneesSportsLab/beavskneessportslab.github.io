@@ -531,3 +531,8 @@ a.osu-pl:hover { border-color: var(--accent); }
 .yak-leans { border-style: dashed; }
 .yak-pick.lean .yak-u { opacity: .55; }
 .yak-pick.lean .yak-name { font-weight: 600; }
+.feature-art { display: block; margin: 0 0 16px; border-left: 4px solid var(--accent); text-decoration: none; color: inherit; }
+.feature-art h2 { font-size: 22px; margin: 4px 0 6px; }
+.feature-art p { margin: 0 0 8px; max-width: 760px; }
+.feature-art:hover h2 { color: var(--accent2); }
+.feature-art .kicker { color: var(--accent); font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
