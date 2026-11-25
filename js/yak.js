@@ -122,7 +122,7 @@ Yak.view = async () => {
   const spotlight = p => {
     const s = sides(p), mine = p.market === "total" ? null : (p.side === "home" ? s.H : s.A);
     return h("div", { class: "yak-spot", style: mine?.color ? `--team:${mine.color}` : null },
-      h("div", { class: "yak-spot-tag" }, "⭐ YAK's Best Bet · 5U"),
+      h("div", { class: "yak-spot-tag" }, "⭐ YAK's Top Play · 5U"),
       h("div", { class: "yak-spot-row" },
         p.market === "total" ? h("div", { class: "yak-pair big" }, pic(s.A, 54, "a"), pic(s.H, 54, "b")) : pic(mine, 72),
         h("div", { style: { minWidth: 0 } },
